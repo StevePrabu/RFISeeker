@@ -8,6 +8,10 @@ from argparse import ArgumentParser
 import ephem
 import time
 from datetime import datetime, timedelta
+from scipy import stats
+from scipy.stats import norm
+from scipy.optimize import leastsq,curve_fit,minimize
+from scipy import special
 
 
 
