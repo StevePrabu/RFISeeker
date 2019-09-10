@@ -1,4 +1,217 @@
 #!/usr/bin/python
 
+from astropy.io import fits
+import numpy as np
+from astropy.wcs import WCS
+from astropy.nddata import Cutout2D
+import os.path
+from argparse import ArgumentParser
+import ephem
+import time
+from datetime import datetime, timedelta
 
-print("testing")
+def intialiseMWA():
+        global mwa
+        mwa = ephem.Observer()
+        mwa.lon = '116:40:14.93485'
+        mwa.lat = '-26:42:11.94986'
+        mwa.elevation = 377.827 #from sea level
+        return;
+
+def plotStarlink(wcs,UTCtime, debug):
+        fl = open('starlinkTLE_all_tle.txt')
+
+        line = fl.readline()
+        counter = 1
+        line1 = 'SATELLITE'
+        while line:
+                if counter%2 ==1:
+                        line2=line
+                else:
+                        line3=line
+                        sat=ephem.readtle(str(line1), str(line2),str(line3))
+                        sat.compute(mwa)
+                        x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                        if (0 <= x < 2000) and (0 <= y < 2000):
+                                plt.plot(x,y, marker='.', color='yellow')
+                                if debug is True:
+                                        print("Plotting Starlink")
+                counter += 1
+                line = fl.readline()
+        return;
+
+def plotLEO(wcs,UTCtime, debug):
+        fl = open('tle.txt')
+        line = fl.readline()
+        counter = 1
+        line1 = 'SATELLITE'
+        while line:
+                if counter%2 ==1:
+                        line2=line
+                else:
+                        line3=line
+                        sat=ephem.readtle(str(line1), str(line2),str(line3))
+                        sat.compute(mwa)
+                        x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                        if (0 <= x < 2000) and (0 <= y < 2000):
+                                plt.plot(x,y, marker='+', color='white')
+                                if debug is True:
+                                        print("Plotting LEO")
+                counter += 1
+                line = fl.readline()
+
+        delay = [-12, -8, -5, 5, 8, 12]
+
+        for d in delay:
+                time_temp = UTCtime + timedelta(seconds=int(d))
+                mwa.date = time_temp
+                fl = open('tle.txt')
+                line = fl.readline()
+                counter = 1
+                line1 = 'SATELLITE'
+                while line:
+                        if counter%2 ==1:
+                                line2=line
+                        else:
+                                line3=line
+                                sat=ephem.readtle(str(line1), str(line2),str(line3))
+                                sat.compute(mwa)
+                                x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                                if (0 <= x < 2000) and (0 <= y < 2000):
+                                        plt.plot(x,y, marker='.', color='white', markersize='1')
+                                        if debug is True:
+                                                print("Plotting LEO trail")
+                        counter += 1
+                        line = fl.readline()
+        return;
+
+
+
+
+def plotHEO(wcs,UTCtime, debug):
+        fl = open('HEOtle.txt')
+        line = fl.readline()
+        counter = 1
+        line1 = 'SATELLITE'
+        while line:
+                if counter%2 ==1:
+                        line2=line
+                else:
+                        line3=line
+                        sat=ephem.readtle(str(line1), str(line2),str(line3))
+                        sat.compute(mwa)
+                        LOS = sat.range
+                        x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                        if np.all((0 <= x < 2000) and (0 <= y < 2000)):
+                                plt.plot(x,y, marker='+', color='black')
+                                if debug is True:
+                                        print("Plotting HEO")
+                counter += 1
+                line = fl.readline()
+        delayHEO = [-15, -8, 8, 15]
+        for dHEO in delayHEO:
+                time_temp = UTCtime + timedelta(seconds=int(dHEO))
+                mwa.date = time_temp
+                fl = open('HEOtle.txt')
+                line = fl.readline()
+                counter = 1
+                line1 = 'SATELLITE'
+                while line:
+                        if counter%2 ==1:
+                                line2=line
+                        else:
+                                line3=line
+                                sat=ephem.readtle(str(line1), str(line2),str(line3))
+                                sat.compute(mwa)
+                                LOS = sat.range
+                                x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                                if np.all((0 <= x < 2000) and (0 <= y < 2000)):
+                                        plt.plot(x,y, marker='.', color='black', markersize='1')
+                                        if debug is True:
+                                                print("Plotting HEO trail")
+                        counter += 1
+                        line = fl.readline()
+        return;
+
+
+def plotMEO(wcs,UTCtime,debug):
+        fl = open('MEOtle.txt')
+        line = fl.readline()
+        counter = 1
+        line1 = 'SATELLITE'
+        while line:
+                if counter%2 ==1:
+                        line2=line
+                else:
+                        line3=line
+                        sat=ephem.readtle(str(line1), str(line2),str(line3))
+                        sat.compute(mwa)
+                        x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                        if (0 <= x < 2000) and (0 <= y < 2000):
+                                plt.plot(x,y, marker='+', color='green')
+                                if debug is True:
+                                        print("Plotting MEO")
+
+                counter += 1
+                line = fl.readline()
+
+        delayMEO = [-10, -5, 5, 10]
+
+        for dMEO in delayMEO:
+                time_temp = UTCtime + timedelta(minutes=int(dMEO))
+                mwa.date = time_temp
+                fl = open('MEOtle.txt')
+                line = fl.readline()
+                counter = 1
+                line1 = 'SATELLITE'
+                while line:
+                        if counter%2 ==1:
+                                line2=line
+                        else:
+                                line3=line
+                                sat=ephem.readtle(str(line1), str(line2),str(line3))
+                                sat.compute(mwa)
+                                x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                                if (0 <= x < 2000) and (0 <= y < 2000):
+                                        plt.plot(x,y, marker='.', color='green', markersize='1')
+                                        if debug is True:
+                                                print("Plotting MEO trail")
+                        counter += 1
+                        line = fl.readline()
+        return;
+
+
+def intialiseMatplotib(debug):
+        global plt, plt2
+        if debug is False:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+                import matplotlib.pyplot as plt2
+        else:
+                import matplotlib.pyplot as plt
+                import matplotlib.pyplot as plt2
+        return;
+
+def floodfill(x,y,sigmaMap,floodfillsigma,ffCounter,frequency):
+        if sigmaMap[x,y] >= floodfillsigma and binaryMap[x,y] == 0:
+                binaryMap[x,y] += 1
+                binaryMaptemp[x,y] = 1
+                binaryMapwithFreq[x,y] = frequency
+                if 1<x<(imgSize-1) and 1 <y < (imgSize-1) and ffCounter < 150:
+                        ffCounter +=1
+                        floodfill(x+1,y,sigmaMap,floodfillsigma,ffCounter,frequency)
+                        floodfill(x,y+1,sigmaMap,floodfillsigma,ffCounter,frequency)
+                        floodfill(x-1,y,sigmaMap,floodfillsigma,ffCounter,frequency)
+                        floodfill(x,y-1,sigmaMap,floodfillsigma,ffCounter,frequency)
+
+                        floodfill(x-1,y-1,sigmaMap,floodfillsigma,ffCounter,frequency)
+                        floodfill(x+1,y-1,sigmaMap,floodfillsigma,ffCounter,frequency)
+                        floodfill(x-1,y+1,sigmaMap,floodfillsigma,ffCounter,frequency)
+                        floodfill(x+1,y+1,sigmaMap,floodfillsigma,ffCounter,frequency)
+        return;
+
+
+
+
+

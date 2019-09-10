@@ -7,7 +7,7 @@ with open("README.md","r") as fh:
 setuptools.setup(
         name="RFISeeker",
         version='0.1',        
-        scipts=['RFISeeker'],
+        scripts=['RFISeeker'],
         author="Steve Prabu",
         description="RFI Source Finding",
         packages=setuptools.find_packages(),
