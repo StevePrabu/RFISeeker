@@ -226,7 +226,7 @@ def cumulative_distribution_function(x,location,scale,a):
 def skew_norm_pdf(x,e=0,w=1,a=0):
         t = (x-e)/w
         output= 2.0*w*(1/(np.sqrt(2*np.pi)))*np.exp((-t**2)/2)*0.5*(1+special.erf(a*t/np.sqrt(2)))
-        return output/abs(sum(output))
+        return output/sum(output)
 
 
 def reqCDF(seedValue):
@@ -270,7 +270,7 @@ def main():
 	binaryMapwithFreq = np.zeros((imgSize, imgSize))
 	timeStep = args.timeStep	
 	for f in range(args.freqChannels):
-		f = 200
+		
 		if debug is True:
 			print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))	
 
@@ -320,6 +320,10 @@ def main():
                 minDiff = min(diffInCDF)
                 position_of_min = int(np.asarray(np.where(diffInCDF == minDiff)))
                 floodfillValue = x[position_of_min]
+
+
+                if debug is True:
+                    print("The seedValue is " + str(seedValue))
 
 
 		#Find points that satisfy the seeding condition	
