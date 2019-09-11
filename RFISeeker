@@ -226,7 +226,7 @@ def cumulative_distribution_function(x,location,scale,a):
 def skew_norm_pdf(x,e=0,w=1,a=0):
         t = (x-e)/w
         output= 2.0*w*(1/(np.sqrt(2*np.pi)))*np.exp((-t**2)/2)*0.5*(1+special.erf(a*t/np.sqrt(2)))
-        return output/sum(output)
+        return output/abs(sum(output))
 
 
 def reqCDF(seedValue):
@@ -270,7 +270,7 @@ def main():
 	binaryMapwithFreq = np.zeros((imgSize, imgSize))
 	timeStep = args.timeStep	
 	for f in range(args.freqChannels):
-		
+		f = 200
 		if debug is True:
 			print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))	
 
@@ -294,11 +294,14 @@ def main():
 		floodfillValue = float(args.floodfillSigma)
 		
 
-                hist,bins = np.histogram(diff, bins=400)
+                hist,bins = np.histogram(diff, bins=800)
                 x = []
                 for i in range(len(bins)-1):
                         x.append(float((bins[i]+bins[i+1])/2.0))
                 pdfOfPixelDist = hist/(imgSize**2.0)
+                
+
+
 
                 def optm(l,x):
                         return skew_norm_pdf(x,l[0],l[1],l[2]) - pdfOfPixelDist
@@ -320,8 +323,9 @@ def main():
 
 
 		#Find points that satisfy the seeding condition	
-		points = np.asarray(np.where(sigmaMap >= seedValue))
-		UTCtime = datetime.strptime(hdu2[0].header['DATE-OBS'][:-2], '%Y-%m-%dT%H:%M:%S')
+		points = np.asarray(np.where(diff >= seedValue))
+		print("The points are " + str(points))
+                UTCtime = datetime.strptime(hdu2[0].header['DATE-OBS'][:-2], '%Y-%m-%dT%H:%M:%S')
 		wcs = WCS(hdu2[0].header, naxis=2)		
 		frequency = float(hdu1[0].header['CRVAL3'])/(10.0)**6
 		
@@ -332,7 +336,7 @@ def main():
 				print("RFI detected. Seeding ...")
 			currentPoint = points[:,p]
 			ffCounter = 0
-			floodfill(currentPoint[0],currentPoint[1],sigmaMap,floodfillValue, ffCounter,frequency)
+			floodfill(currentPoint[0],currentPoint[1],diff,floodfillValue, ffCounter,frequency)
 			contourPoints = np.asarray(np.where(binaryMaptemp == 1))
 			if len(contourPoints[0,:]) is 0:
 				continue
