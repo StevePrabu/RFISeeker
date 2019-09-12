@@ -314,7 +314,7 @@ def main():
                 diffInCDF = abs(cdf - reqCDF(args.seedSigma))
                 minDiff = min(diffInCDF)
                 position_of_min = int(np.asarray(np.where(diffInCDF == minDiff)))
-                seedValue = x[position_of_min]
+                seedValue = x[position_of_min] + (x[2]-x[1])/2.0
 
                 diffInCDF = abs(cdf - reqCDF(args.floodfillSigma))
                 minDiff = min(diffInCDF)
@@ -322,13 +322,13 @@ def main():
                 floodfillValue = x[position_of_min]
 
 
+
                 if debug is True:
                     print("The seedValue is " + str(seedValue))
-
+                    print("The image max is " + str(np.max(diff)))
 
 		#Find points that satisfy the seeding condition	
-		points = np.asarray(np.where(diff >= seedValue))
-		print("The points are " + str(points))
+		points = np.asarray(np.where(diff > seedValue))
                 UTCtime = datetime.strptime(hdu2[0].header['DATE-OBS'][:-2], '%Y-%m-%dT%H:%M:%S')
 		wcs = WCS(hdu2[0].header, naxis=2)		
 		frequency = float(hdu1[0].header['CRVAL3'])/(10.0)**6
@@ -403,9 +403,9 @@ def main():
 			if debug is True:
 				plt.show()	
 				print(np.sum(binaryMap))
-			else:
-				plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(p).zfill(2) + ".png")
-				plt.savefig(str(args.prefix) + "Sigma" + "HD_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(p).zfill(2) + ".png",dpi=1200)
+			
+			plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(p).zfill(2) + ".png")
+			plt.savefig(str(args.prefix) + "Sigma" + "HD_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(p).zfill(2) + ".png",dpi=1200)
 				
 			plt.clf()
 		
