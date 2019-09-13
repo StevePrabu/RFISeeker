@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 def intialiseMatplotib(debug):
-	global plt
+	
 	if debug is False:
 		import matplotlib
 		matplotlib.use('Agg')
@@ -10,5 +10,5 @@ def intialiseMatplotib(debug):
 	else:
 		import matplotlib.pyplot as plt
 		
-	return;
+	return plt;
 
