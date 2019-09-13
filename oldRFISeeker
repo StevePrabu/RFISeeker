@@ -1,0 +1,434 @@
+#!/usr/bin/python2
+from astropy.io import fits
+import numpy as np
+from astropy.wcs import WCS
+from astropy.nddata import Cutout2D
+import os.path
+from argparse import ArgumentParser
+import ephem
+import time
+from datetime import datetime, timedelta
+from scipy import stats
+from scipy.stats import norm
+from scipy.optimize import leastsq,curve_fit,minimize
+from scipy import special
+
+
+
+def intialiseMWA():
+	global mwa
+ 	mwa = ephem.Observer()
+	mwa.lon = '116:40:14.93485'
+	mwa.lat = '-26:42:11.94986'
+	mwa.elevation = 377.827 #from sea level
+	return;
+
+
+def plotStarlink(wcs,UTCtime, debug):
+	fl = open('starlinkTLE_all_tle.txt')
+
+	line = fl.readline()
+	counter = 1
+	line1 = 'SATELLITE'
+	while line:
+		if counter%2 ==1:
+			line2=line
+		else:
+			line3=line
+			sat=ephem.readtle(str(line1), str(line2),str(line3))
+			sat.compute(mwa)
+			x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+			if (0 <= x < 2000) and (0 <= y < 2000):
+				plt.plot(x,y, marker='.', color='yellow')
+				if debug is True:
+					print("Plotting Starlink")		
+		counter += 1
+		line = fl.readline()
+	return;
+
+def plotLEO(wcs,UTCtime, debug):
+	fl = open('tle.txt')
+	line = fl.readline()
+	counter = 1
+	line1 = 'SATELLITE'
+	while line:
+		if counter%2 ==1:
+			line2=line
+		else:
+			line3=line
+			sat=ephem.readtle(str(line1), str(line2),str(line3))
+			sat.compute(mwa)
+			x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+			if (0 <= x < 2000) and (0 <= y < 2000):
+				plt.plot(x,y, marker='+', color='white')
+				if debug is True:
+					print("Plotting LEO")
+		counter += 1
+		line = fl.readline()
+
+	delay = [-12, -8, -5, 5, 8, 12]
+			
+	for d in delay:
+		time_temp = UTCtime + timedelta(seconds=int(d))
+		mwa.date = time_temp
+		fl = open('tle.txt')
+		line = fl.readline()
+		counter = 1
+		line1 = 'SATELLITE'
+		while line:
+			if counter%2 ==1:
+				line2=line
+			else:
+				line3=line
+				sat=ephem.readtle(str(line1), str(line2),str(line3))
+				sat.compute(mwa)
+				x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]	
+				if (0 <= x < 2000) and (0 <= y < 2000):
+					plt.plot(x,y, marker='.', color='white', markersize='1')
+					if debug is True:
+						print("Plotting LEO trail")
+			counter += 1
+			line = fl.readline()	
+	return;
+
+def plotHEO(wcs,UTCtime, debug):
+	fl = open('HEOtle.txt')
+	line = fl.readline()
+	counter = 1
+	line1 = 'SATELLITE'
+	while line:
+		if counter%2 ==1:
+			line2=line
+		else:
+			line3=line
+			sat=ephem.readtle(str(line1), str(line2),str(line3))
+			sat.compute(mwa)
+			LOS = sat.range
+			x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+			if np.all((0 <= x < 2000) and (0 <= y < 2000)):
+				plt.plot(x,y, marker='+', color='black')
+				if debug is True:
+					print("Plotting HEO")
+		counter += 1
+		line = fl.readline()
+	delayHEO = [-15, -8, 8, 15]
+	for dHEO in delayHEO:
+		time_temp = UTCtime + timedelta(seconds=int(dHEO))
+		mwa.date = time_temp
+		fl = open('HEOtle.txt')
+		line = fl.readline()
+		counter = 1
+		line1 = 'SATELLITE'
+		while line:
+			if counter%2 ==1:
+				line2=line
+			else:
+				line3=line
+				sat=ephem.readtle(str(line1), str(line2),str(line3))
+				sat.compute(mwa)
+				LOS = sat.range
+				x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+				if np.all((0 <= x < 2000) and (0 <= y < 2000)):
+					plt.plot(x,y, marker='.', color='black', markersize='1')
+					if debug is True:
+						print("Plotting HEO trail")
+			counter += 1
+			line = fl.readline()	
+	return;
+
+def plotMEO(wcs,UTCtime,debug):
+	fl = open('MEOtle.txt')	
+	line = fl.readline()
+	counter = 1
+	line1 = 'SATELLITE'
+	while line:
+		if counter%2 ==1:
+			line2=line
+		else:
+			line3=line
+			sat=ephem.readtle(str(line1), str(line2),str(line3))
+			sat.compute(mwa)
+			x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+			if (0 <= x < 2000) and (0 <= y < 2000):
+				plt.plot(x,y, marker='+', color='green')	
+				if debug is True:
+					print("Plotting MEO")
+
+		counter += 1
+		line = fl.readline()	
+
+	delayMEO = [-10, -5, 5, 10]
+
+	for dMEO in delayMEO:
+        	time_temp = UTCtime + timedelta(minutes=int(dMEO))
+                mwa.date = time_temp
+                fl = open('MEOtle.txt')
+                line = fl.readline()
+                counter = 1
+                line1 = 'SATELLITE'
+                while line:
+                	if counter%2 ==1:
+                        	line2=line
+                        else:
+                        	line3=line
+                                sat=ephem.readtle(str(line1), str(line2),str(line3))
+                                sat.compute(mwa)
+                                x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                                if (0 <= x < 2000) and (0 <= y < 2000):
+                                	plt.plot(x,y, marker='.', color='green', markersize='1')
+					if debug is True:
+						print("Plotting MEO trail")
+			counter += 1
+                        line = fl.readline()
+	return;
+
+def intialiseMatplotib(debug):
+	global plt, plt2
+	if debug is False:
+		import matplotlib
+		matplotlib.use('Agg')
+		import matplotlib.pyplot as plt
+		import matplotlib.pyplot as plt2
+	else:
+		import matplotlib.pyplot as plt
+		import matplotlib.pyplot as plt2
+	return;
+
+def floodfill(x,y,sigmaMap,floodfillsigma,ffCounter,frequency):
+	if sigmaMap[x,y] >= floodfillsigma and binaryMap[x,y] == 0:
+		binaryMap[x,y] += 1
+		binaryMaptemp[x,y] = 1
+		binaryMapwithFreq[x,y] = frequency
+		if 1<x<(imgSize-1) and 1 <y < (imgSize-1) and ffCounter < 150:
+			ffCounter +=1
+			floodfill(x+1,y,sigmaMap,floodfillsigma,ffCounter,frequency)
+			floodfill(x,y+1,sigmaMap,floodfillsigma,ffCounter,frequency)
+			floodfill(x-1,y,sigmaMap,floodfillsigma,ffCounter,frequency)
+			floodfill(x,y-1,sigmaMap,floodfillsigma,ffCounter,frequency)
+		
+			floodfill(x-1,y-1,sigmaMap,floodfillsigma,ffCounter,frequency)
+			floodfill(x+1,y-1,sigmaMap,floodfillsigma,ffCounter,frequency)
+			floodfill(x-1,y+1,sigmaMap,floodfillsigma,ffCounter,frequency)
+			floodfill(x+1,y+1,sigmaMap,floodfillsigma,ffCounter,frequency)	
+	return;
+
+
+
+
+
+def cumulative_distribution_function(x,location,scale,a):
+        temp = (x- location)/abs(scale)
+        return 0.5*(1+special.erf(temp/np.sqrt(2))) - 2.0*special.owens_t(temp,a)
+
+
+
+
+def skew_norm_pdf(x,e=0,w=1,a=0):
+        t = (x-e)/w
+        output= 2.0*w*(1/(np.sqrt(2*np.pi)))*np.exp((-t**2)/2)*0.5*(1+special.erf(a*t/np.sqrt(2)))
+        return output/sum(output)
+
+
+def reqCDF(seedValue):
+        return 0.5*(1+special.erf(float(seedValue)/np.sqrt(2)))
+
+
+
+def main():
+	parser = ArgumentParser("Flagger", description="Flagges and plots DSNRS for RFI")
+	parser.add_argument('--obs', required=True, help="The observation id")
+	parser.add_argument('--freqChannels', required=True,type=int, help="Number of frequency channels to process")
+	parser.add_argument('--timeStep', required=True, type=int, help="The timestep at which RFISeeker runs")
+	parser.add_argument('--seedSigma', default=8, help="The sigma threshold for RFI seeding" )
+	parser.add_argument('--floodfillSigma', default=3, help="The sigma upto which flood fill happens")
+	parser.add_argument('--debug', default=False, type=bool,help="Prints out more values and shows figure if ran in debug mode")
+	parser.add_argument('--plotSatellites', default=False,type=bool,help="Plots the location of the starlink constellation in a different color")
+	parser.add_argument('--imgSize',required=False, type=int, help="The size of the images")
+	parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
+	args = parser.parse_args()
+	
+	debug = args.debug
+	intialiseMatplotib(debug)
+	intialiseMWA()	
+
+	FMList = [88.1,88.3,88.5,88.6,88.7,88.9,89.1,89.3,89.5,89.7,89.9,90.1,90.3,90.5,90.7,90.9,91.1,91.3,91.5,91.7,91.9,92.1,92.3,92.5,92.7,92.9,93.1,93.3,93.5,93.7,93.9,94.1,94.3,94.5,94.7,94.9,95.1,95.3,95.5,95.7,95.9,96.1,96.3,96.5,96.7,96.9,97.1,97.3,97.4,97.5,97.7,97.9,98.1,98.3,98.5,98.7,98.9,99.1,99.3,99.4,99.5,99.7,99.9,100.1,100.3,100.5,100.6,100.7,100.9,101.1,101.3,101.5,101.7,101.9,102.1,102.3,102.5,102.7,102.9,103.1,103.2,103.3,103.5,103.7,103.9,104.1,104.3,104.5,104.7,104.9,105.1,105.3,105.5,105.7,105.9,106.1,106.3,106.5,106.7,106.9,107.1,107.3,107.5,107.7,107.9]
+
+
+	hdu =fits.open(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-dirty.fits")
+	global imgSize
+	imgSize = int(hdu[0].header['NAXIS1'])
+	
+	global nofreqbinaryMap
+	nofreqbinaryMap = np.zeros((imgSize, imgSize))
+	global intensitybinaryMap
+	intensitybinaryMap = np.zeros((imgSize, imgSize))
+	global ffCounter
+	ffCounter = 0
+	global binaryMap	
+	binaryMap = np.zeros((imgSize, imgSize))
+	global binaryMapwithFreq
+	binaryMapwithFreq = np.zeros((imgSize, imgSize))
+	timeStep = args.timeStep	
+	for f in range(args.freqChannels):
+		
+		if debug is True:
+			print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))	
+
+	
+		hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-dirty.fits")
+		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-dirty.fits")
+		diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:] #makes the difference image for that channel
+		
+		if np.all(diff == 0):
+			continue
+
+
+		rmsMap = np.zeros((imgSize, imgSize))
+		#rms = np.sqrt(np.mean(diff**2))
+                rms = np.std(diff)
+		rmsMap[:,:]=rms
+
+		sigmaMap = diff/rmsMap #Contains the sigma map for the difference image
+			
+		seedValue = float(args.seedSigma)
+		floodfillValue = float(args.floodfillSigma)
+		
+
+                hist,bins = np.histogram(diff, bins=800)
+                x = []
+                for i in range(len(bins)-1):
+                        x.append(float((bins[i]+bins[i+1])/2.0))
+                pdfOfPixelDist = hist/(imgSize**2.0)
+                
+
+
+
+                def optm(l,x):
+                        return skew_norm_pdf(x,l[0],l[1],l[2]) - pdfOfPixelDist
+
+                guess = [  0.0025,   11.0,   0.005]
+                dataFit = np.asarray(leastsq(optm,guess,(x,)))
+                fit = skew_norm_pdf(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
+                cdf = cumulative_distribution_function(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
+                
+                diffInCDF = abs(cdf - reqCDF(args.seedSigma))
+                minDiff = min(diffInCDF)
+                position_of_min = int(np.asarray(np.where(diffInCDF == minDiff)))
+                seedValue = x[position_of_min] + (x[2]-x[1])/2.0
+
+                diffInCDF = abs(cdf - reqCDF(args.floodfillSigma))
+                minDiff = min(diffInCDF)
+                position_of_min = int(np.asarray(np.where(diffInCDF == minDiff)))
+                floodfillValue = x[position_of_min]
+
+
+
+                if debug is True:
+                    print("The seedValue is " + str(seedValue))
+                    print("The image max is " + str(np.max(diff)))
+
+		#Find points that satisfy the seeding condition	
+		points = np.asarray(np.where(diff > seedValue))
+                UTCtime = datetime.strptime(hdu2[0].header['DATE-OBS'][:-2], '%Y-%m-%dT%H:%M:%S')
+		wcs = WCS(hdu2[0].header, naxis=2)		
+		frequency = float(hdu1[0].header['CRVAL3'])/(10.0)**6
+		
+		for p in range(len(points[0,:])):
+			global binaryMaptemp
+			binaryMaptemp = np.zeros((imgSize,imgSize)) #binary map that stores the local RFI
+			if debug is True:
+				print("RFI detected. Seeding ...")
+			currentPoint = points[:,p]
+			ffCounter = 0
+			floodfill(currentPoint[0],currentPoint[1],diff,floodfillValue, ffCounter,frequency)
+			contourPoints = np.asarray(np.where(binaryMaptemp == 1))
+			if len(contourPoints[0,:]) is 0:
+				continue
+			cutout = Cutout2D(diff, (currentPoint[1],currentPoint[0]), (100,100), wcs=wcs)
+			ax = plt.subplot(2,2,1, projection=cutout.wcs)
+			plt.imshow(cutout.data, cmap=plt.cm.inferno, origin='lower')
+			plt.grid(color='black', linestyle='-')
+			plt.colorbar()
+			snr_array = [None]*args.freqChannels
+			signal_array = [None]*args.freqChannels
+			plt.subplot(2,2,2)
+			num = 0
+			for f2 in range(args.freqChannels):
+				if debug is True:
+					print("Plotting Spectrum for RFI at freq " + str(f2))
+				hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-dirty.fits")
+				hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-dirty.fits")
+				diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
+				#noise = Cutout2D(diff2, (750,750),(200,200))
+				noise_rms = np.sqrt(np.mean(diff2**2))
+				signal = 0
+				for pointNo in range(len(contourPoints[0,:])):
+					signal += diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
+				
+				signal = signal/float(len(contourPoints[0,:]))
+				signal_array[f2] = signal
+				signal = signal/noise_rms
+				if signal > 4:
+					num +=1
+								
+				snr_array[f2] = signal
+			maxSignal = max(signal_array)
+			intensitybinaryMap += binaryMaptemp*maxSignal
+			nofreqbinaryMap += binaryMaptemp*num
+			i_array = np.linspace(72.335,103.015,args.freqChannels)
+			plt.plot(i_array,snr_array,color="black",linewidth=0.5)
+			plt.grid()	
+
+			## This section plots the contour
+			contourImg = Cutout2D(binaryMaptemp,(currentPoint[1],currentPoint[0]), (100,100))
+			ax = plt.subplot(2,2,3,projection=cutout.wcs)
+			plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
+			plt.grid()
+			plt.colorbar()
+			
+			## This section plots the satellites along with the orbit prediction
+			ax = plt.subplot(2,2,4,projection=wcs)
+			plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
+			mwa.date = UTCtime
+
+			plt.scatter(currentPoint[1], currentPoint[0], s=80, facecolors='none', edgecolors='lime')
+			if args.plotSatellites is True:
+				plotLEO(wcs, UTCtime, debug)
+				plotMEO(wcs, UTCtime, debug)
+				plotHEO(wcs, UTCtime, debug)
+				plotStarlink(wcs,UTCtime, debug)
+			plt.grid()
+			
+
+			if debug is True:
+				plt.show()	
+				print(np.sum(binaryMap))
+			
+			plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(p).zfill(2) + ".png")
+			plt.savefig(str(args.prefix) + "Sigma" + "HD_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(p).zfill(2) + ".png",dpi=1200)
+				
+			plt.clf()
+		
+	plt.clf()
+	hdu = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(50).zfill(4) + "-dirty.fits")	
+	wcs = WCS(hdu[0].header, naxis=2)
+	ax = plt.subplot(1,1,1, projection=wcs)
+	plt.imshow(binaryMap, cmap=plt.cm.inferno, origin="lower")
+	plt.grid()
+	plt.savefig(str(args.prefix) + "Sigma" + "RFIBinaryMap_timeStep" + str(timeStep).zfill(4) + ".png",dpi=1200)
+	plt.clf()
+
+	hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
+	hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")			
+	hdun2 = fits.PrimaryHDU(binaryMapwithFreq,header=hdu[0].header)
+	hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-withFreq-t" + str(timeStep).zfill(4) + ".fits")
+		
+	hdun3 = fits.PrimaryHDU(nofreqbinaryMap, header=hdu[0].header)
+	hdun3.writeto(str(args.prefix) + "Sigma" + "nofreqbinaryMap-" + str(timeStep).zfill(4) + ".fits")
+
+	hdun4 = fits.PrimaryHDU(intensitybinaryMap, header=hdu[0].header)
+	hdun4.writeto(str(args.prefix) + "Sigma" + "intensitybinaryMap-" + str(timeStep).zfill(4) + ".fits")
+
+if __name__ == "__main__":
+	main()		
+	
