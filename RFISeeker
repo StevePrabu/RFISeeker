@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python
 from astropy.io import fits
 import numpy as np
 from astropy.wcs import WCS
