@@ -89,12 +89,13 @@ def main():
 
             guess = [  0.0025,   11.0,   0.005]
             dataFit = np.asarray(leastsq(optm,guess,(x,)))
+            x2 = np.linspace(np.mean(x), (max(x)+10.0),2000)
             fit = skew_norm_pdf(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
-            cdf = cumulative_distribution_function(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
+            cdf = cumulative_distribution_function(x2,dataFit[0][0],dataFit[0][1],dataFit[0][2])
     
             ## The below calculates the seedValue and floodfillValue
-            seedValue = getSeedValue(cdf,float(args.seedSigma),x)
-            floodfillValue = getFloodfillValue(cdf,float(args.floodfillSigma),x)
+            seedValue = getSeedValue(cdf,float(args.seedSigma),x2)
+            floodfillValue = getFloodfillValue(cdf,float(args.floodfillSigma),x2)
 
             if debug is True:
                 print("The seedValue is " + str(seedValue) + " and the maximum value is " + str(np.max(diff)))
