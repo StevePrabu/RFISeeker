@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import division
 from astropy.io import fits
 import numpy as np
 from astropy.wcs import WCS
@@ -50,7 +51,9 @@ def main():
 	parser.add_argument('--plotSatellites', default=False,type=bool,help="Plots the location of the starlink constellation in a different color")
 	parser.add_argument('--imgSize',required=False, type=int, help="The size of the images")
 	parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
-	args = parser.parse_args()
+	parser.add_argument('--DSNRS', required=False,default=True,help="Disable/Enable DSNRS analysis")
+        parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset it frequency')
+        args = parser.parse_args()
 	debug = args.debug
 
         imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-dirty.fits")
@@ -65,6 +68,8 @@ def main():
 
 
         for f in range(args.freqChannels):
+            
+            f += args.deltaF
 
             if debug is True:
                 print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))
@@ -87,16 +92,31 @@ def main():
             def optm(l,q):
                 return skew_norm_pdf(q,l[0],l[1],l[2]) - pdfOfPixelDist
 
+            
+            initStd = np.std(diff)
             guess = [  0.0025,   11.0,   0.005]
             dataFit = np.asarray(leastsq(optm,guess,(x,)))
-            x2 = np.linspace(np.mean(x), (max(x)+10.0),2000)
+            x2 = np.linspace(np.mean(x), (max(x)+10.0),20000)
             fit = skew_norm_pdf(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
             cdf = cumulative_distribution_function(x2,dataFit[0][0],dataFit[0][1],dataFit[0][2])
-    
+            finalStd = np.std(fit)
+            #print("The datafit is")
+            #print(dataFit)
+
+            #plt.plot(x,cdf)
+            #plt.plot(x,fit)
+            #plt.plot(x,pdfOfPixelDist)
+            #plt.yscale('log')
+            #print(cdf)
+
             ## The below calculates the seedValue and floodfillValue
             seedValue = getSeedValue(cdf,float(args.seedSigma),x2)
             floodfillValue = getFloodfillValue(cdf,float(args.floodfillSigma),x2)
-
+    
+            #print(seedValue)
+            #print("cdf at seedValue is " + str(cumulative_distribution_function(seedValue,dataFit[0][0],dataFit[0][1],dataFit[0][2])))
+            #plt.vlines(seedValue, 0, 0.001)
+            #plt.show()
             if debug is True:
                 print("The seedValue is " + str(seedValue) + " and the maximum value is " + str(np.max(diff)))
 
@@ -119,6 +139,7 @@ def main():
                 if len(contourPoints[0,:]) is 0:
                     continue
                 
+                
                 cutout = Cutout2D(diff, (currentPoint[1],currentPoint[0]), (100,100), wcs=wcs)
                 ax = plt.subplot(221, projection=cutout.wcs)
                 plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
@@ -127,41 +148,42 @@ def main():
 
                 snr_array = [None]*args.freqChannels
                 
-                plt.subplot(222)
+                if args.DSNRS is True:
+                    plt.subplot(222)
                 
-                for f2 in range(args.freqChannels):
+                    for f2 in range(args.freqChannels):
 
-                    if debug is True:
-                        print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
+                        if debug is True:
+                            print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
 
-                    hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-dirty.fits")
-                    hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-dirty.fits")
-                    diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
+                        hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-dirty.fits")
+                        hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-dirty.fits")
+                        diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
 
-                    noise_rms = np.sqrt(np.mean(diff2**2.0))
+                        noise_rms = np.sqrt(np.mean(diff2**2.0))
 
-                    signal=0
-                    for pointNo in range(len(contourPoints[0,:])):
-                        signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
+                        signal=0
+                        for pointNo in range(len(contourPoints[0,:])):
+                            signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
 
-                    signal = signal/float(len(contourPoints[0,:]))
-                    snr_array[f2] = signal/noise_rms
+                        signal = signal/float(len(contourPoints[0,:]))
+                        snr_array[f2] = signal/noise_rms
 
-                i_array = np.linspace(72.335,103.015,args.freqChannels)
-                plt.plot(i_array,snr_array,color="black",linewidth=0.5)
-                plt.grid()
+                    i_array = np.linspace(72.335,103.015,args.freqChannels)
+                    plt.plot(i_array,snr_array,color="black",linewidth=0.5)
+                    plt.grid()
 
-                ## the below section plots the contour
-                contourImg = Cutout2D(binaryMaptemp, (currentPoint[1],currentPoint[0]), (100,100),wcs=wcs)
-                ax = plt.subplot(223,projection=contourImg.wcs)
-                plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
-                plt.grid()
-                plt.colorbar()
+                    ## the below section plots the contour
+                    contourImg = Cutout2D(binaryMaptemp, (currentPoint[1],currentPoint[0]), (100,100),wcs=wcs)
+                    ax = plt.subplot(223,projection=contourImg.wcs)
+                    plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
+                    plt.grid()
+                    plt.colorbar()
 
-                ax = plt.subplot(224, projection=wcs)
-                plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
-                plt.grid()
-                plt.scatter(currentPoint[1],currentPoint[0],s=80,facecolors='none',edgecolors='lime')
+                    ax = plt.subplot(224, projection=wcs)
+                    plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
+                    plt.grid()
+                    plt.scatter(currentPoint[1],currentPoint[0],s=80,facecolors='none',edgecolors='lime')
 
 
                 if debug is True:

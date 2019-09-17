@@ -4,7 +4,7 @@ from scipy import special
 
 def cumulative_distribution_function(x,location,scale,a):
         temp = (x- location)/abs(scale)
-        return 0.5*(1+special.erf(temp/np.sqrt(2))) - 2.0*special.owens_t(temp,a)
+        return 0.5*(1+special.erf(temp/np.sqrt(2.0))) - 2.0*special.owens_t(temp,abs(a))
 
 def skew_norm_pdf(x,e=0,w=1,a=0):
         t = (x-e)/w
