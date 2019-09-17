@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import special
+from scipy.optimize import root_scalar
 
 
 def cumulative_distribution_function(x,location,scale,a):
@@ -18,16 +19,26 @@ def reqCDF(seedValue):
 def getSeedValue(cdf,seedSigma,x):
     diffInCDF = abs(cdf - reqCDF(seedSigma))
     minDiff = min(diffInCDF)
+    position_of_min = np.asarray(np.where(diffInCDF == minDiff))
+    index = position_of_min[0][0]
+    seedValue = x[index] + (x[2]-x[1])/2.0
+    return seedValue
+
+def getFloodfillValue(cdf,seedSigma,x):
+    diffInCDF = abs(cdf - reqCDF(seedSigma))
+    minDiff = min(diffInCDF)
     position_of_min = int(np.asarray(np.where(diffInCDF == minDiff)))
     seedValue = x[position_of_min] + (x[2]-x[1])/2.0
     return seedValue
 
 
-def getFloodfillValue(cdf,floodfillSigma,x):
-    diffInCDF = abs(cdf - reqCDF(floodfillSigma))
-    minDiff = min(diffInCDF)
-    position_of_min = int(np.asarray(np.where(diffInCDF == minDiff)))
-    floodfillValue = x[position_of_min] + (x[2]-x[1])/2.0
-    return floodfillValue
+#def getSeedValue(seedSigma,location,scale,a):
+#    target = 0.99999999
+#    sol = root_scalar(lambda x, *args: cumulative_distribution_function(x, *args) - target,bracket=(-6*scale + location, 6*scale + location),args=(location, scale, a))
+#    return float(sol.root)
 
+#def getFloodfillValue(floodfillSigma,location,scale,a):
+#    target = reqCDF(floodfillSigma)
+#    sol = root_scalar(lambda x, *args: cumulative_distribution_function(x, *args) - target,bracket=(-6*scale + location, 6*scale + location),args=(location, scale, a))
+#    return float(sol.root)
 

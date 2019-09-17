@@ -57,6 +57,7 @@ def main():
         args = parser.parse_args()
 	debug = args.debug
 
+	hdu = fits.open(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-dirty.fits")
         imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-dirty.fits")
         plt = intialiseMatplotib(debug)
 
@@ -118,20 +119,20 @@ def main():
             floodfillValue = getFloodfillValue(cdf,float(args.floodfillSigma),x2)
 	    oldthreshold = np.std(diff)*float(args.seedSigma)
 
-	    if seedValue < oldthreshold:
-		c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt","w+" )
-		c.close()
-		continue
+	    #if seedValue < oldthreshold:
+	    #	c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt","w+" )
+	    #	c.close()
+	    #	continue
 
             if debug is True:
                 print("The seedValue is " + str(seedValue) + " and the maximum value is " + str(np.max(diff)))
-                plt.plot(x,pdfOfPixelDist)
-		plt.plot(x,fit)
-                plt.vlines(seedValue,0,0.002,colors='green')
-		plt.vlines(oldthreshold,0,0.002,colors='red')
-		plt.yscale('log')
-		plt.show()
-	        plt.clf()
+                #plt.plot(x,pdfOfPixelDist)
+		#plt.plot(x,fit)
+                #plt.vlines(seedValue,0,0.002,colors='green')
+		#plt.vlines(oldthreshold,0,0.002,colors='red')
+		#plt.yscale('log')
+		#plt.show()
+	        #plt.clf()
 
             ## The below finds the values that satisfy the seedValue
             points = np.asarray(np.where(diff > seedValue))
@@ -206,7 +207,7 @@ def main():
                 plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(counter2).zfill(2) + ".png")
                 plt.clf()
 		binaryMapf += binaryMaptemp
-		if counter > 20:
+		if counter2 > 20:
 		    binaryMap -= binaryMapf
 		    c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt","w+" )
 		    c.close()
