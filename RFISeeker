@@ -92,34 +92,23 @@ def main():
             def optm(l,q):
                 return skew_norm_pdf(q,l[0],l[1],l[2]) - pdfOfPixelDist
 
-            
-            initStd = np.std(diff)
             guess = [  0.0025,   11.0,   0.005]
             dataFit = np.asarray(leastsq(optm,guess,(x,)))
             x2 = np.linspace(np.mean(x), (max(x)+10.0),20000)
             fit = skew_norm_pdf(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
             cdf = cumulative_distribution_function(x2,dataFit[0][0],dataFit[0][1],dataFit[0][2])
-            finalStd = np.std(fit)
-            #print("The datafit is")
-            #print(dataFit)
-
-            #plt.plot(x,cdf)
-            #plt.plot(x,fit)
-            #plt.plot(x,pdfOfPixelDist)
-            #plt.yscale('log')
-            #print(cdf)
 
             ## The below calculates the seedValue and floodfillValue
             seedValue = getSeedValue(cdf,float(args.seedSigma),x2)
             floodfillValue = getFloodfillValue(cdf,float(args.floodfillSigma),x2)
     
-            #print(seedValue)
-            #print("cdf at seedValue is " + str(cumulative_distribution_function(seedValue,dataFit[0][0],dataFit[0][1],dataFit[0][2])))
-            #plt.vlines(seedValue, 0, 0.001)
-            #plt.show()
             if debug is True:
                 print("The seedValue is " + str(seedValue) + " and the maximum value is " + str(np.max(diff)))
-
+                plt.plot(x,pdfOfPixelDist)
+                plt.plot(x,fit)
+                plt.yscale('log')
+                plt.show()
+                plt.clf()
 
             ## The below finds the values that satisfy the seedValue
             points = np.asarray(np.where(diff > seedValue))
