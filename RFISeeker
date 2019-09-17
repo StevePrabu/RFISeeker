@@ -106,7 +106,6 @@ def main():
                 print("The seedValue is " + str(seedValue) + " and the maximum value is " + str(np.max(diff)))
                 plt.plot(x,pdfOfPixelDist)
                 plt.plot(x,fit)
-                plt.yscale('log')
                 plt.show()
                 plt.clf()
 
