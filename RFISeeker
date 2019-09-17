@@ -119,7 +119,7 @@ def main():
 	    oldthreshold = np.std(diff)*float(args.seedSigma)
 
 	    if seedValue < oldthreshold:
-		c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt",,"w+" )
+		c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt","w+" )
 		c.close()
 		continue
 
@@ -208,9 +208,10 @@ def main():
 		binaryMapf += binaryMaptemp
 		if counter > 20:
 		    binaryMap -= binaryMapf
-		    c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt",,"w+" )	
+		    c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt","w+" )
 		    c.close()
 		    break
+		
 
         hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
         hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
