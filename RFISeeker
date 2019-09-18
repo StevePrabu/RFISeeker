@@ -26,7 +26,7 @@ from mwassa.plotting import intialiseMatplotib
 
 def floodfill(x,y,floodfillValue,diff,imgSize):
     if diff[x,y] >= floodfillValue and binaryMap[x,y] ==0:
-        binaryMap[x,y] =1
+        #binaryMap[x,y] =1
         binaryMaptemp[x,y] =1
         if 1<x<(imgSize-1) and 1<y<(imgSize-1):
             floodfill(x+1,y,floodfillValue,diff,imgSize)
@@ -164,7 +164,8 @@ def main():
                 plt.colorbar()
 
                 snr_array = [None]*args.freqChannels
-                
+                numOfSigPeaks = 0
+
                 if args.DSNRS is True:
                     plt.subplot(222)
                 
@@ -185,7 +186,8 @@ def main():
 
                         signal = signal/float(len(contourPoints[0,:]))
                         snr_array[f2] = signal/noise_rms
-
+                        if signal/noise_rms > 3:
+                            numOfSigPeaks += 1
                     i_array = np.linspace(72.335,103.015,args.freqChannels)
                     plt.plot(i_array,snr_array,color="black",linewidth=0.5)
                     plt.grid()
@@ -201,10 +203,17 @@ def main():
                     plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
                     plt.grid()
                     plt.scatter(currentPoint[1],currentPoint[0],s=80,facecolors='none',edgecolors='lime')
+                if numOfSigPeaks >= 2:
+                    binaryMap += binaryMaptemp
+                else:
+                    if debug is True:
+                        print("detected RFI is most likely a ")
+                    continue
 
 
                 if debug is True:
                     plt.show()
+
 
                 plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(counter2).zfill(2) + ".png")
                 plt.clf()
