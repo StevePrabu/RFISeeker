@@ -67,10 +67,12 @@ def main():
 
         timeStep = args.timeStep
 
-
+	
 
         for f in range(args.freqChannels):
-            
+            if timeStep in [0,1,2]:
+		break	
+		    
             f += args.deltaF
 
             if debug is True:
