@@ -26,7 +26,7 @@ from mwassa.plotting import intialiseMatplotib
 
 def floodfill(x,y,floodfillValue,diff,imgSize):
     if diff[x,y] >= floodfillValue and binaryMap[x,y] ==0:
-        #binaryMap[x,y] =1
+        binaryMap[x,y] =1
         binaryMaptemp[x,y] =1
         if 1<x<(imgSize-1) and 1<y<(imgSize-1):
             floodfill(x+1,y,floodfillValue,diff,imgSize)
@@ -64,7 +64,8 @@ def main():
         #below array saves info of all the detections in a given timeStep
         global binaryMap
         binaryMap = np.zeros((imgSize,imgSize))
-
+	global binaryMapOutput
+	binaryMapOutput = np.zeros((imgSize,imgSize))
         timeStep = args.timeStep
 
 	
@@ -204,7 +205,7 @@ def main():
                     plt.grid()
                     plt.scatter(currentPoint[1],currentPoint[0],s=80,facecolors='none',edgecolors='lime')
                 if numOfSigPeaks >= 2:
-                    binaryMap += binaryMaptemp
+                    binaryMapOutput += binaryMaptemp
                 else:
                     if debug is True:
                         print("detected RFI is most likely a ")
@@ -225,7 +226,7 @@ def main():
 		    break
 		
 
-        hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
+        hdun = fits.PrimaryHDU(binaryMapOutput,header=hdu[0].header)
         hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
 
 
