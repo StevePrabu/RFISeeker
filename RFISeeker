@@ -83,28 +83,29 @@ def main():
             hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-dirty.fits")
             diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
 
+	    std = np.std(diff)
             ## The below skips all flagged channels
             if np.all(diff == 0):
                 continue
 
             ## The below looks at the pixel distribution and does a curve fit
-            hist, bins = np.histogram(diff, bins=1500)
-            x = []
-            for counter1 in range(len(bins)-1):
-                x.append(float((bins[counter1] + bins[counter1+1])/2.0))
-            pdfOfPixelDist = hist/(float(imgSize)**2.0) #probability density distribution for the pixel amp
+            #hist, bins = np.histogram(diff, bins=1500)
+            #x = []
+            #for counter1 in range(len(bins)-1):
+            #    x.append(float((bins[counter1] + bins[counter1+1])/2.0))
+            #pdfOfPixelDist = hist/(float(imgSize)**2.0) #probability density distribution for the pixel amp
             
-            def optm(l,q):
-                return skew_norm_pdf(q,l[0],l[1],l[2]) - pdfOfPixelDist
+            #def optm(l,q):
+            #    return skew_norm_pdf(q,l[0],l[1],l[2]) - pdfOfPixelDist
 
-            initStd = skew(pdfOfPixelDist)
-	    guess = [  0.0025,   11.0,   0.005]
-            dataFit = np.asarray(leastsq(optm,guess,(x,)))
-            x2 = np.linspace(np.mean(x), (max(x)+10.0),20000)
-            fit = skew_norm_pdf(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
-            cdf = cumulative_distribution_function(x2,dataFit[0][0],dataFit[0][1],dataFit[0][2])
-	    finalStd = skew(fit)
-	    conv = True
+            #initStd = skew(pdfOfPixelDist)
+	    #guess = [  0.0025,   11.0,   0.005]
+            #dataFit = np.asarray(leastsq(optm,guess,(x,)))
+            #x2 = np.linspace(np.mean(x), (max(x)+10.0),20000)
+            #fit = skew_norm_pdf(x,dataFit[0][0],dataFit[0][1],dataFit[0][2])
+            #cdf = cumulative_distribution_function(x2,dataFit[0][0],dataFit[0][1],dataFit[0][2])
+	    #finalStd = skew(fit)
+	    #conv = True
 	    #if abs(finalStd-initStd) > 0.018:
 	    #	conv = False
 	    
@@ -118,26 +119,10 @@ def main():
 		
 		
             ## The below calculates the seedValue and floodfillValue
-            seedValue = getSeedValue(cdf,float(args.seedSigma),x2)
-            floodfillValue = getFloodfillValue(cdf,float(args.floodfillSigma),x2)
-	    oldthreshold = np.std(diff)*float(args.seedSigma)
-
-	    #if seedValue < oldthreshold:
-	    #	c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt","w+" )
-	    #	c.close()
-	    #	continue
-
-            if debug is True:
-                print("The seedValue is " + str(seedValue) + " and the maximum value is " + str(np.max(diff)))
-                #plt.plot(x,pdfOfPixelDist)
-		#plt.plot(x,fit)
-                #plt.vlines(seedValue,0,0.002,colors='green')
-		#plt.vlines(oldthreshold,0,0.002,colors='red')
-		#plt.yscale('log')
-		#plt.show()
-	        #plt.clf()
-
-            ## The below finds the values that satisfy the seedValue
+            seedValue = float(args.seedSigma)*std
+            floodfillValue = float(args.floodfillSigma)*std
+            
+	    ## The below finds the values that satisfy the seedValue
             points = np.asarray(np.where(diff > seedValue))
 	    global binaryMapf
 	    binaryMapf = np.zeros((imgSize,imgSize))
@@ -190,9 +175,6 @@ def main():
 
                         signal = signal/float(len(contourPoints[0,:]))
                         snr_array[f2] = signal/noise_rms
-                        #if signal/noise_rms > 3:
-                        #    numOfSigPeaks += 1
-			#    print("peak and value is " + str(signal/noise_rms) + " with sig " + str(signal) + " and noise " + str(noise_rms))
                     i_array = np.linspace(72.335,103.015,args.freqChannels)
                     plt.plot(i_array,snr_array,color="black",linewidth=0.5)
                     plt.grid()
@@ -214,7 +196,7 @@ def main():
 		    numberofrfi +=1
                 else:
                     if debug is True:
-                        print("detected RFI is most likely a ")
+                        print("detected RFI is most likely a sidelobe :( ")
                     continue
 
 
@@ -225,11 +207,6 @@ def main():
                 plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(numberofrfi).zfill(2) + ".png")
                 plt.clf()
 		binaryMapf += binaryMaptemp
-		if numberofrfi > 20:
-		    binaryMap -= binaryMapf
-		    c = open(str(args.prefix) + "error-t" + str(args.timeStep) +"-f" + str(f) + ".txt","w+" )
-		    c.close()
-		    break
 		
 
         hdun = fits.PrimaryHDU(binaryMapOutput,header=hdu[0].header)
