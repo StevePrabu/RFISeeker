@@ -54,6 +54,7 @@ def main():
 	parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
 	parser.add_argument('--DSNRS', required=False,default=True,help="Disable/Enable DSNRS analysis")
         parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset it frequency')
+	parser.add_argument('--evenTimeStepsOnly',default=False,type=bool, help="enable wokring with even timeSteps for observations like Alouette")
         args = parser.parse_args()
 	debug = args.debug
 
@@ -74,13 +75,19 @@ def main():
             if timeStep in [0,1,2]:
 		break	
 		    
-            f += args.deltaF
+            if args.evenTimeStepsOnly is True:
+                if not timeStep%2==0:
+		    break
+	    f += args.deltaF
 
             if debug is True:
                 print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))
 
             hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-dirty.fits")
-            hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-dirty.fits")
+	    if args.evenTimeStepsOnly is True:
+            	hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-dirty.fits")
+	    else:
+		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-dirty.fits")
             diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
 
 	    std = np.std(diff)
@@ -161,7 +168,10 @@ def main():
                             print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
 
                         hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-dirty.fits")
-                        hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-dirty.fits")
+			if args.evenTimeStepsOnly is True:
+                            hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+2) + "-" + str(f2).zfill(4) + "-dirty.fits")
+                        else:
+			    hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-dirty.fits")
                         diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
 			
 			if np.all(diff2 == 0):
