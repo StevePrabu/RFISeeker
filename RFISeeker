@@ -196,7 +196,6 @@ def main():
 
                 plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(numberofrfi).zfill(2) + ".png")
                 plt.clf()
-		binaryMapf += binaryMaptemp
 		
 
         hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
