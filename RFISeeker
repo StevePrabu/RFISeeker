@@ -96,7 +96,7 @@ def main():
 	    if args.evenTimeStepsOnly is True:
             	hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
 	    else:
-		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
             diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
 
 	    std = np.std(diff)
