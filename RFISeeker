@@ -57,11 +57,12 @@ def main():
 	parser.add_argument('--DSNRS', required=False,default=True,help="Disable/Enable DSNRS analysis")
         parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset it frequency')
 	parser.add_argument('--evenTimeStepsOnly',default=False,type=bool, help="enable wokring with even timeSteps for observations like Alouette")
-        args = parser.parse_args()
+        parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
+	args = parser.parse_args()
 	debug = args.debug
 
-	hdu = fits.open(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-image.fits")
-        imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-image.fits")
+	hdu = fits.open(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-"+ str(args.ext)+".fits")
+        imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(0) + "-" + str(0).zfill(4) + "-"+str(args.ext)+".fits")
         plt = intialiseMatplotib(debug)
 
         #below array saves info of all the detections in a given timeStep
@@ -71,6 +72,8 @@ def main():
 	binaryMapT = np.zeros((imgSize,imgSize))
 	global binaryMapF
 	binaryMapF = np.zeros((imgSize,imgSize))
+	global binaryMapS
+	binaryMapS = np.zeros((imgSize,imgSize))
 	global binaryMapOutput
 	binaryMapOutput = np.zeros((imgSize,imgSize))
         timeStep = args.timeStep
@@ -89,11 +92,11 @@ def main():
             if debug is True:
                 print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))
 
-            hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-image.fits")
+            hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
 	    if args.evenTimeStepsOnly is True:
-            	hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-image.fits")
+            	hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
 	    else:
-		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-image.fits")
+		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
             diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
 
 	    std = np.std(diff)
@@ -111,16 +114,11 @@ def main():
 	    ## this section does the refinement of points ####
 	    points=[]
 	    pointsValue = diff[pointsInit[:,0],pointsInit[:,1]]
-	    psfHDU = fits.open("1162810368-2m--" + str(f).zfill(4) + "-psf.fits")
-	    points = mask(psfHDU,pointsInit,pointsValue,imgSize)
-	    if debug is True:
-		print("Found " + str(len(pointsInit)) + " seeds but only using " + str(len(points)) + " of them")
+	    #psfHDU = fits.open("1162810368-2m--" + str(f).zfill(4) + "-psf.fits")
+	    points = mask(pointsInit,pointsValue,imgSize)
 	    ############################################################
 
 	    
-	    global binaryMapf
-	    binaryMapf = np.zeros((imgSize,imgSize))
-	    numberofrfi = 0
             for counter2 in range(len(points)):
                 plt.clf()
 		global binaryMaptemp
@@ -130,6 +128,8 @@ def main():
                     print("RFI detected, seeding .......")
 
                 currentPoint = points[counter2]
+		if binaryMap[currentPoint[0],currentPoint[1]] ==0:
+		    binaryMapS[currentPoint[0],currentPoint[1]] = 1
                 floodfill(currentPoint[0],currentPoint[1],floodfillValue,diff,imgSize,timeStep,f)
                 contourPoints = np.asarray(np.where(binaryMaptemp ==1))
 
@@ -145,7 +145,7 @@ def main():
                 plt.colorbar()
 
                 snr_array = [None]*args.freqChannels
-                
+                numberofrfi = 0 
                 if args.DSNRS is True:
                     plt.subplot(222)
                 
@@ -154,11 +154,11 @@ def main():
                         if debug is True:
                             print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
 
-                        hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-image.fits")
+                        hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
 			if args.evenTimeStepsOnly is True:
-                            hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+2) + "-" + str(f2).zfill(4) + "-image.fits")
+                            hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+2) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
                         else:
-			    hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-image.fits")
+			    hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
                         diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
 			
 			if np.all(diff2 == 0):
@@ -205,6 +205,8 @@ def main():
 	hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapT-t" + str(timeStep).zfill(4) + ".fits")
 	hdun3 = fits.PrimaryHDU(binaryMapF,header=hdu[0].header)
 	hdun3.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapF-t" + str(timeStep).zfill(4) + ".fits")
+	hudn4 = fits.PrimaryHDU(binaryMapS,header=hdu[0].header)
+	hdun4.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapS-t" + str(timeStep).zfill(4) + ".fits")
 
 if __name__ =="__main__":
     main()
