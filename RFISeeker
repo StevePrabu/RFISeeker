@@ -24,19 +24,21 @@ from mwassa.adaptiveMasking import mask
 
 
 
-def floodfill(x,y,floodfillValue,diff,imgSize):
+def floodfill(x,y,floodfillValue,diff,imgSize,timeStep,f):
     if diff[x,y] >= floodfillValue and binaryMap[x,y] ==0:
         binaryMap[x,y] =1
         binaryMaptemp[x,y] =1
+	binaryMapT[x,y] = timeStep
+	binaryMapF[x,y] = f
         if 1<x<(imgSize-1) and 1<y<(imgSize-1):
-            floodfill(x+1,y,floodfillValue,diff,imgSize)
-            floodfill(x,y+1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y,floodfillValue,diff,imgSize)
-            floodfill(x,y-1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y-1,floodfillValue,diff,imgSize)
-            floodfill(x+1,y-1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y+1,floodfillValue,diff,imgSize)
-            floodfill(x+1,y+1,floodfillValue,diff,imgSize)
+            floodfill(x+1,y,floodfillValue,diff,imgSize,timeStep,f)
+            floodfill(x,y+1,floodfillValue,diff,imgSize,timeStep,f)
+            floodfill(x-1,y,floodfillValue,diff,imgSize,timeStep,f)
+            floodfill(x,y-1,floodfillValue,diff,imgSize,timeStep,f)
+            floodfill(x-1,y-1,floodfillValue,diff,imgSize,timeStep,f)
+            floodfill(x+1,y-1,floodfillValue,diff,imgSize,timeStep,f)
+            floodfill(x-1,y+1,floodfillValue,diff,imgSize,timeStep,f)
+            floodfill(x+1,y+1,floodfillValue,diff,imgSize,timeStep,f)
     return
 
 
@@ -65,6 +67,10 @@ def main():
         #below array saves info of all the detections in a given timeStep
         global binaryMap
         binaryMap = np.zeros((imgSize,imgSize))
+	global binaryMapT
+	binaryMapT = np.zeros((imgSize,imgSize))
+	global binaryMapF
+	binaryMapF = np.zeros((imgSize,imgSize))
 	global binaryMapOutput
 	binaryMapOutput = np.zeros((imgSize,imgSize))
         timeStep = args.timeStep
@@ -105,7 +111,7 @@ def main():
 	    ## this section does the refinement of points ####
 	    points=[]
 	    pointsValue = diff[pointsInit[:,0],pointsInit[:,1]]
-	    psfHDU = fits.open(str(args.obs)+"-2m--" + str(f).zfill(4) + "-psf.fits")
+	    psfHDU = fits.open("1162810368-2m--" + str(f).zfill(4) + "-psf.fits")
 	    points = mask(psfHDU,pointsInit,pointsValue,imgSize)
 	    if debug is True:
 		print("Found " + str(len(pointsInit)) + " seeds but only using " + str(len(points)) + " of them")
@@ -124,7 +130,7 @@ def main():
                     print("RFI detected, seeding .......")
 
                 currentPoint = points[counter2]
-                floodfill(currentPoint[0],currentPoint[1],floodfillValue,diff,imgSize)
+                floodfill(currentPoint[0],currentPoint[1],floodfillValue,diff,imgSize,timeStep,f)
                 contourPoints = np.asarray(np.where(binaryMaptemp ==1))
 
                 ## the below breaks out if the current rfi is already been investigated into
@@ -195,7 +201,10 @@ def main():
 
         hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
         hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
-
+	hdun2 = fits.PrimaryHDU(binaryMapT,header=hdu[0].header)
+	hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapT-t" + str(timeStep).zfill(4) + ".fits")
+	hdun3 = fits.PrimaryHDU(binaryMapF,header=hdu[0].header)
+	hdun3.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapF-t" + str(timeStep).zfill(4) + ".fits")
 
 if __name__ =="__main__":
     main()
