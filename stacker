@@ -1,0 +1,83 @@
+#!/usr/bin/python
+from __future__ import division
+from astropy.io import fits
+import numpy as np
+from astropy.wcs import WCS
+from astropy.nddata import Cutout2D
+import os.path
+from argparse import ArgumentParser
+import ephem
+import time
+from datetime import datetime, timedelta
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+#The below sets MWA as the observer
+mwa = ephem.Observer()
+mwa.lon = '116:40:14.93485'
+mwa.lat = '-26:42:11.94986'
+mwa.elevation = 377.827 #from sea level
+
+
+
+def main():
+	parser = ArgumentParser("Stacks images")
+	parser.add_argument('--obs', required=True, help="The observation id")
+	parser.add_argument('--timeStep', required=True, type=int, help="The timestep at which RFISeeker runs")
+	parser.add_argument("--noStacks",default=5,type=int,help="The number of timeSteps to stack")
+	parser.add_argument("--NORADID",required=True,type=int,help="The NORAD ID of the target")
+	parser.add_argument('--freqChannels', required=True,type=int, help="Number of frequency channels to process")
+	args = parser.parse_args()
+	
+	l = open(str(args.NORADID) + ".txt")
+	line1 = l.readline()
+	line2 = l.readline()
+	line3 = l.readline()
+	sat = ephem.readtle(line1, line2, line3)
+	signal = np.zeros(args.freqChannels)
+	
+	hdu = fits.open(str(args.obs) + "-2m-" + str(args.timeStep) + "-" + str(0).zfill(4) + "-dirty.fits")
+	time_delay_array = np.linspace(-25,25,210)	
+	t_temp = np.zeros(210)
+	output = np.zeros((args.freqChannels,len(time_delay_array)))
+	counter_f=0
+	for f in range(args.freqChannels):
+		t_sum = np.zeros(210)
+		for i in range(args.noStacks):
+			hdu1 = fits.open(str(args.obs) + "-2m-" + str(args.timeStep+i) + "-" + str(f).zfill(4) + "-dirty.fits")
+			hdu2 = fits.open(str(args.obs) + "-2m-" + str(args.timeStep+1+i) + "-" + str(f).zfill(4) + "-dirty.fits")
+			data = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
+			if np.all(data == 0):
+				continue
+			wcs = WCS(hdu2[0].header,naxis=2)
+			UTCTime = datetime.strptime(hdu2[0].header['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f')
+			counter_t = 0
+			t_temp = np.zeros(210)
+			for t in time_delay_array:
+				mwa.date = UTCTime + timedelta(seconds=t)
+				sat.compute(mwa)
+				xy = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+				x = int(np.floor(xy[0]))
+				y = int(np.floor(xy[1]))
+				local_area = Cutout2D(data, position=[x,y], size=[7,7])
+				t_temp[counter_t] = np.sum(local_area.data)/(49.0*np.sqrt(np.mean(data**2)))
+				counter_t +=1
+			t_sum +=t_temp
+			#print("i " + str(i)+ " f " + str(f))
+		output[counter_f,:] = t_sum
+		counter_f +=1
+
+	np.savetxt( str(args.NORADID)+"id"+str(args.timeStep)+ "stacked" + str(args.noStacks) +"output.txt",output)
+	output = np.ma.masked_where(output==0,output)
+	cmap=plt.cm.inferno
+	cmap.set_bad(color="black")
+	plt.imshow(output,cmap=cmap,aspect="auto",extent=[-25,25,103.015,72.335])
+	plt.xlabel("delta T (s)")
+	plt.ylabel("Frequency (MHz)")
+	plt.colorbar()	
+	plt.savefig(str(args.NORADID)+"id"+str(args.timeStep)+ "stacked" + str(args.noStacks) +"output.png")	
+
+if __name__ == "__main__":
+	main()
+
