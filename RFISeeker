@@ -83,135 +83,132 @@ def main():
 
         global thewriter
 	with open(str(args.obs) + "Freq.csv","w") as vsc:
-        	thewriter = csv.writer(vsc)	
-		thewriter.writerow(["freq","x","y"])
-		for f in range(args.freqChannels):
-            		if timeStep in [0,1,2]:
-		    		break	
+            thewriter = csv.writer(vsc)	
+	    thewriter.writerow(["freq","x","y"])
+            for f in range(args.freqChannels):
+                if timeStep in [0,1,2]:
+		    break	
 		    
-                	if args.evenTimeStepsOnly is True:
-                    		if not timeStep%2==0:
-		        		break
-	        	f += args.deltaF
+                if args.evenTimeStepsOnly is True:
+                    if not timeStep%2==0:
+		        break
+	        f += args.deltaF
 
-                	if debug is True:
-                    		print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))
+                if debug is True:
+                    print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))
 
-                	hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-	        	if args.evenTimeStepsOnly is True:
-            	    		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-	        	else:
-		    		hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-                	diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
+                hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+	        if args.evenTimeStepsOnly is True:
+            	    hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+	        else:
+		    hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+                diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
 
-	        	std = np.std(diff)
-                	## The below skips all flagged channels
-                	if np.all(diff == 0):
-                    		continue
+	        std = np.std(diff)
+                ## The below skips all flagged channels
+                if np.all(diff == 0):
+                    continue
 
 		
-                	## The below calculates the seedValue and floodfillValue
-                	seedValue = float(args.seedSigma)*std
-                	floodfillValue = float(args.floodfillSigma)*std
+                ## The below calculates the seedValue and floodfillValue
+                seedValue = float(args.seedSigma)*std
+                floodfillValue = float(args.floodfillSigma)*std
             
-	        	## The below finds the values that satisfy the seedValue
-                	pointsInit = np.asarray(np.where(diff > seedValue)).T
-	        	## this section does the refinement of points ####
-	        	points=[]
-	        	pointsValue = diff[pointsInit[:,0],pointsInit[:,1]]
-	        	#psfHDU = fits.open("1162810368-2m--" + str(f).zfill(4) + "-psf.fits")
-	        	points = mask(pointsInit,pointsValue,imgSize)
+	        ## The below finds the values that satisfy the seedValue
+                pointsInit = np.asarray(np.where(diff > seedValue)).T
+	        ## this section does the refinement of points ####
+	        points=[]
+	        pointsValue = diff[pointsInit[:,0],pointsInit[:,1]]
+	        #psfHDU = fits.open("1162810368-2m--" + str(f).zfill(4) + "-psf.fits")
+	        points = mask(pointsInit,pointsValue,imgSize)
 	    
-	        	############################################################
+	        ############################################################
 
 	    
-                	for counter2 in range(len(points)):
-                    		plt.clf()
-		    		global binaryMaptemp
-                    		binaryMaptemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
+                for counter2 in range(len(points)):
+                    plt.clf()
+		    global binaryMaptemp
+                    binaryMaptemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
 
-                    		if debug is True:
-                        		print("RFI detected, seeding .......")
+                    if debug is True:
+                        print("RFI detected, seeding .......")
 
-                    		currentPoint = points[counter2]
-		    		if binaryMap[currentPoint[0],currentPoint[1]] ==0:
-		        		binaryMapS[currentPoint[0],currentPoint[1]] = timeStep
-                    		floodfill(currentPoint[0],currentPoint[1],floodfillValue,diff,imgSize,timeStep,f)
-                    		contourPoints = np.asarray(np.where(binaryMaptemp ==1))
+                    currentPoint = points[counter2]
+		    if binaryMap[currentPoint[0],currentPoint[1]] ==0:
+		        binaryMapS[currentPoint[0],currentPoint[1]] = timeStep
+                    floodfill(currentPoint[0],currentPoint[1],floodfillValue,diff,imgSize,timeStep,f)
+                    contourPoints = np.asarray(np.where(binaryMaptemp ==1))
 
-                    		## the below breaks out if the current rfi is already been investigated into
-                    		if len(contourPoints[0,:]) is 0:
-                        		continue
+                    ## the below breaks out if the current rfi is already been investigated into
+                    if len(contourPoints[0,:]) is 0:
+                        continue
                 
                 
-                    		cutout = Cutout2D(diff, (currentPoint[1],currentPoint[0]), (100,100), wcs=wcs)
-                    		ax = plt.subplot(221, projection=cutout.wcs)
-                    		plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
-                    		plt.grid(color="black",linestyle='-')
-                    		plt.colorbar()
+                    cutout = Cutout2D(diff, (currentPoint[1],currentPoint[0]), (100,100), wcs=wcs)
+                    ax = plt.subplot(221, projection=cutout.wcs)
+                    plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
+                    plt.grid(color="black",linestyle='-')
+                    plt.colorbar()
 
-                    		snr_array = [None]*args.freqChannels
-                    		numberofrfi = 0 
-                    		if args.DSNRS is True:
-                        		plt.subplot(222)
+                    snr_array = [None]*args.freqChannels
+                    numberofrfi = 0 
+                    if args.DSNRS is True:
+                        plt.subplot(222)
                 
-                        		for f2 in range(args.freqChannels):
+                        for f2 in range(args.freqChannels):
 
-                            			if debug is True:
-                                			print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
+                            if debug is True:
+                                print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
 
-                            			hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-			    			if args.evenTimeStepsOnly is True:
-                                			hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+2) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                           		 	else:
-			        			hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                            			diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
+                            hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
+			    if args.evenTimeStepsOnly is True:
+                                hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+2) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
+                            else:
+			        hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
+                            diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
 			
-			    			if np.all(diff2 == 0):
-		                			continue
+			    if np.all(diff2 == 0):
+		                continue
 
-                            			noise_rms = np.sqrt(np.mean(diff2**2.0))
+                            noise_rms = np.sqrt(np.mean(diff2**2.0))
 
-                            			signal=0
-                            			for pointNo in range(len(contourPoints[0,:])):
-                                			signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
+                            signal=0
+                            for pointNo in range(len(contourPoints[0,:])):
+                                signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
 
-                            				signal = signal/float(len(contourPoints[0,:]))
-                            				snr_array[f2] = signal/noise_rms
-                        				i_array = np.linspace(72.335,103.015,args.freqChannels)
-                        		plt.plot(i_array,snr_array,color="black",linewidth=0.5)
-                        		plt.grid()
+                            	signal = signal/float(len(contourPoints[0,:]))
+                            	snr_array[f2] = signal/noise_rms
+                        i_array = np.linspace(72.335,103.015,args.freqChannels)
+                        plt.plot(i_array,snr_array,color="black",linewidth=0.5)
+                        plt.grid()
 
-                        		## the below section plots the contour
-                        		contourImg = Cutout2D(binaryMaptemp, (currentPoint[1],currentPoint[0]), (100,100),wcs=wcs)
-                        		ax = plt.subplot(223,projection=contourImg.wcs)
-                        		plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
-                        		plt.grid()
-                        		plt.colorbar()
+                    ## the below section plots the contour
+                    contourImg = Cutout2D(binaryMaptemp, (currentPoint[1],currentPoint[0]), (100,100),wcs=wcs)
+                    ax = plt.subplot(223,projection=contourImg.wcs)
+                    plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
+                    plt.grid()
+                    plt.colorbar()
 
-                        		ax = plt.subplot(224, projection=wcs)
-                        		plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
-                        		plt.grid()
-                        		plt.scatter(currentPoint[1],currentPoint[0],s=80,facecolors='none',edgecolors='lime')
-                         
-		                  
-
-                    		if debug is True:
-                        		plt.show()
+                    ax = plt.subplot(224, projection=wcs)
+                    plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
+                    plt.grid()
+                    plt.scatter(currentPoint[1],currentPoint[0],s=80,facecolors='none',edgecolors='lime')
+                    if debug is True:
+                        plt.show()
 
 
-                    		plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(numberofrfi).zfill(2) + ".png")
-                    		plt.clf()
-		    		numberofrfi +=1	
+                    plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(numberofrfi).zfill(2) + ".png")
+                    plt.clf()
+		    numberofrfi +=1	
 
-            		hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
-            		hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
-	    		#hdun2 = fits.PrimaryHDU(binaryMapT,header=hdu[0].header)
-	    		#hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapT-t" + str(timeStep).zfill(4) + ".fits")
-	    		#hdun3 = fits.PrimaryHDU(binaryMapF,header=hdu[0].header)
-	    		#hdun3.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapF-t" + str(timeStep).zfill(4) + ".fits")
-	    		hdun4 = fits.PrimaryHDU(binaryMapS,header=hdu[0].header)
-	    		hdun4.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapS-t" + str(timeStep).zfill(4) + ".fits")
+            hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
+            hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
+	    #hdun2 = fits.PrimaryHDU(binaryMapT,header=hdu[0].header)
+	    #hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapT-t" + str(timeStep).zfill(4) + ".fits")
+	    #hdun3 = fits.PrimaryHDU(binaryMapF,header=hdu[0].header)
+	    #hdun3.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapF-t" + str(timeStep).zfill(4) + ".fits")
+	    hdun4 = fits.PrimaryHDU(binaryMapS,header=hdu[0].header)
+	    hdun4.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapS-t" + str(timeStep).zfill(4) + ".fits")
 
 if __name__ =="__main__":
     main()
