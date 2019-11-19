@@ -16,7 +16,9 @@ from scipy.optimize import leastsq,curve_fit,minimize
 from scipy import special
 from scipy.signal import find_peaks
 import csv
-
+from subprocess import call
+import time
+from datetime import datetime, timedelta
 ##custom 
 from mwassa.imginfo import info
 from mwassa.curvefitting import skew_norm_pdf, reqCDF, cumulative_distribution_function, getSeedValue, getFloodfillValue
@@ -26,8 +28,8 @@ from mwassa.adaptiveMasking import mask
 
 
 def floodfill(x,y,floodfillValue,diff,imgSize,timeStep,f):
-    if diff[x,y] >= floodfillValue:
-        line = [f,x,y]
+    if diff[x,y] >= floodfillValue and binaryMaptemp[x,y] ==0:
+        line = [f,x,y,UTCTime]
 	thewriter.writerow(line)
 	binaryMap[x,y] =1
         binaryMaptemp[x,y] =1
@@ -68,6 +70,8 @@ def main():
         imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(args.timeStep) + "-" + str(0).zfill(4) + "-"+str(args.ext)+".fits")
         plt = intialiseMatplotib(debug)
 
+	bash1 = call("rm 7S*",shell=True)
+
         #below array saves info of all the detections in a given timeStep
         global binaryMap
         binaryMap = np.zeros((imgSize,imgSize))
@@ -82,9 +86,9 @@ def main():
         timeStep = args.timeStep
 
         global thewriter
-	with open(str(args.obs) + "Freq.csv","w") as vsc:
+	with open(str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv","w") as vsc:
             thewriter = csv.writer(vsc)	
-	    thewriter.writerow(["freq","x","y"])
+	    thewriter.writerow(["freq","x","y","time"])
             for f in range(args.freqChannels):
                 if timeStep in [0,1,2]:
 		    break	
@@ -103,7 +107,8 @@ def main():
 	        else:
 		    hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
                 diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
-
+		global UTCTime
+		UTCTime = datetime.strptime(hdu2[0].header['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f')
 	        std = np.std(diff)
                 ## The below skips all flagged channels
                 if np.all(diff == 0):
