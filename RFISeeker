@@ -65,8 +65,8 @@ def main():
     #The below obtains some preiliminary data and checks
     imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(args.timeStep) + "-" + str(0).zfill(4) + "-"+str(args.ext)+".fits")
     plt = intialiseMatplotib(debug)
-    bashSyntax = "rm " + str(args.prefix) + "*"
-    bashExecute = call(bashSyntax,shell=True)
+    #bashSyntax = "rm " + str(args.prefix) + "*"
+    #bashExecute = call(bashSyntax,shell=True)
 
     #The below are the output arrays
     global binaryMap
@@ -154,10 +154,14 @@ def main():
         plt.scatter(maxPoint[1][0],maxPoint[0][0],s=80,facecolors='none',edgecolors='lime')
         if debug is True:
             plt.show()
+    bashSyn1 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
+    bashExecute1 = call(bashSyn1,shell=True)
     hdun = fits.PrimaryHDU(binaryMap,header=header)
     hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
     
     ## The below makes the CSV file containing the meta data from the RFISeeker
+    bashSyn2 = "rm " + str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"
+    bashExecute2 = call(bashSyn2,shell=True)
     with open(str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv","w") as vsc:
         thewriter = csv.writer(vsc)
         thewriter.writerow(["x","y","PeakFluxDensity","NoOfChannels","DistanceFromPhaseCenter"])
