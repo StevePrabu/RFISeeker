@@ -33,7 +33,7 @@ def floodfill(x,y,floodfillValue,diff,imgSize):
         binarMapNoFreq[x,y] += 1
         if diff[x,y] > binaryMapPeakFlux[x,y]:
             binaryMapPeakFlux[x,y] = diff[x,y]
-        binaryMapDistFromPC[x,y] = np.sqrt((x-(imgSize/2.0))**2.0+(y-(imgSize/2.0))**2.0)
+        binaryMapDistFromPC[x,y] = np.sqrt((x-(imgSize/2.0))**2.0+(y-(imgSize/2.0))**2.0)*0.0833333
         if 1 < x < (imgSize-1) and 1 < y < (imgSize-1):
             floodfill(x+1,y,floodfillValue,diff,imgSize)
             floodfill(x,y+1,floodfillValue,diff,imgSize)
@@ -71,6 +71,8 @@ def main():
     #The below are the output arrays
     global binaryMap
     binaryMap = np.zeros((imgSize,imgSize))
+    global binaryMapNoPixels
+    binaryMapNoPixels = np.zeros((imgSize,imgSize))
     global binarMapNoFreq
     binarMapNoFreq = np.zeros((imgSize,imgSize))
     global binaryMapPeakFlux
@@ -110,7 +112,8 @@ def main():
             print("RFI detected, seeding....")
 
         floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)    
-        
+        noOfPoints = int(np.count_nonzero(binaryMapTemp==1))
+        binaryMapNoPixels[np.where(binaryMapTemp==1)] = noOfPoints
         contourPoints = np.asarray(np.where(binaryMapTemp ==1))
 
         ## the below breaks out if the current rfi is already investigated
@@ -164,7 +167,7 @@ def main():
     bashExecute2 = call(bashSyn2,shell=True)
     with open(str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv","w") as vsc:
         thewriter = csv.writer(vsc)
-        thewriter.writerow(["x","y","PeakFluxDensity","NoOfChannels","DistanceFromPhaseCenter"])
+        thewriter.writerow(["x","y","PeakFluxDensity","NoOfChannels","DistanceFromPhaseCenter","NoOfPixels"])
         points = np.asarray(np.where(binaryMap != 0)).T
 
         for p in points:
@@ -172,7 +175,8 @@ def main():
             peakFluxDensity = binaryMapPeakFlux[x,y]
             NoOfChannels = binarMapNoFreq[x,y]
             DistanceFromPhaseCenter = binaryMapDistFromPC[x,y]
-            line = [x,y,peakFluxDensity,NoOfChannels,DistanceFromPhaseCenter]
+            NoOfPixels = binaryMapNoPixels[x,y]
+            line = [x,y,peakFluxDensity,NoOfChannels,DistanceFromPhaseCenter,NoOfPixels]
             thewriter.writerow(line)
 
 
