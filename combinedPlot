@@ -22,6 +22,8 @@ import matplotlib.pyplot as plt
 
 plt.style.use('dark_background')
 
+#font = {'family' : 'normal','weight' : 'bold','size'   : 6}
+font = {'family' : 'normal','size'   : 2}
 
 mwa = ephem.Observer()
 mwa.lon = '116:40:14.93485'
@@ -41,7 +43,7 @@ for i in range(56):
     print(UTCtime)
     wcs = WCS(hdu[0].header, naxis=2)
     ax = plt.subplot(111, projection=wcs)
-        
+      
     timeDela = np.linspace(-100,100,200)
 
     t = 0
@@ -71,7 +73,7 @@ for i in range(56):
                 x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
                 radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
                 if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
-                    plt.text(y,x, str(satID) + "-r" + str(sat.range) )
+                    plt.text(x,y, str(satID) + "-r" + str(int(float(sat.range)/1000)) ,color='black',**font)
 		if sat.range < 1000000 and radius <= 250:
                     print("True")
                     w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
@@ -129,7 +131,7 @@ for i in range(56):
                 x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
                 radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
                 if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
-                    plt.text(y,x, str(satID) + "-r" + str(sat.range) )
+                    plt.text(x,y, str(satID) + "-r" + str(int(float(sat.range)/1000)) ,color='black',**font)
 		if sat.range < 1000000 and radius <= 250:
                     w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
                     rline = w.readline()
@@ -185,7 +187,7 @@ for i in range(56):
                 
                 radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
                 if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
-                    plt.text(y,x, str(satID) + "-r" + str(sat.range) )
+                    plt.text(x,y, str(satID) + "-r" + str(int(float(sat.range)/1000)) ,color='black',**font)
 		if sat.range < 1000000 and radius <= 250:
                     w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
                     rline = w.readline()
@@ -241,7 +243,7 @@ for i in range(56):
     plt.xlabel("RA (Degrees)")
     plt.ylabel("DEC (Degrees)")
     
-    plt.savefig("timeLapseWITHLOG" + str(i).zfill(4) + ".png")
+    plt.savefig("timeLapseWITHLOG" + str(i).zfill(4) + ".png",dpi=1000)
 
 
 
