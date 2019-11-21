@@ -45,7 +45,7 @@ for i in range(56):
     timeDela = np.linspace(-100,100,200)
 
     t = 0
-    print(t)
+    #print(t)
     try:
         time = UTCtime + timedelta(seconds=t)
         mwa.date = time
@@ -57,7 +57,7 @@ for i in range(56):
     counter = 1
     line1 = "starlink"
     while line:
-        print(counter)
+        #print(counter)
         if counter%2 ==1:
             line2 = line
         else:
@@ -140,6 +140,7 @@ for i in range(56):
 
 
                     if local_RCS >= 0.785 and (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+			print("plotting and id is " + str(satID) + " and range is " + str(sat.range/1000.0))
                         LeoData[int(y),int(x)] =2
                         LeoData[int(y+1),int(x)] =2
                         LeoData[int(y),int(x+1)] =2
@@ -193,6 +194,7 @@ for i in range(56):
 
 
                     if local_RCS >= 0.785 and (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+			print("plotting and id is " + str(satID) + " and range is " + str(sat.range/1000.0))
                         LeoData[int(y),int(x)] =2
                         LeoData[int(y+1),int(x)] =2
                         LeoData[int(y),int(x+1)] =2
