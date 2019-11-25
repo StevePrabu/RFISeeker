@@ -101,13 +101,13 @@ def main():
         floodfillValue = float(args.floodfillSigma)*std
 
         # The below checks if max point is greater than seed value
-        Points = np.asarray(np.where(diff >= seedValue))
+        Points = np.asarray(np.where(diff >= seedValue)).T
 	for maxPoint in Points:
 	    global binaryMapTemp
 	    binaryMapTemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
 	    if debug is True:
 		print("RFI detected, seeding....")
-	    floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)
+	    floodfill(maxPoint[0], maxPoint[1], floodfillValue,diff , imgSize)
 	    noOfPoints = int(np.count_nonzero(binaryMapTemp==1))
 	    binaryMapNoPixels[np.where(binaryMapTemp==1)] = noOfPoints
 	    contourPoints = np.asarray(np.where(binaryMapTemp ==1))
