@@ -26,194 +26,160 @@ from mwassa.plotting import intialiseMatplotib
 from mwassa.adaptiveMasking import mask
 
 
-
-def floodfill(x,y,floodfillValue,diff,imgSize,timeStep,f):
-    if diff[x,y] >= floodfillValue and binaryMaptemp[x,y] ==0:
-        line = [f,x,y,UTCTime]
-	thewriter.writerow(line)
-	binaryMap[x,y] =1
-        binaryMaptemp[x,y] =1
-	binaryMapT[x,y] = timeStep
-	binaryMapF[x,y] = f
-        if 1<x<(imgSize-1) and 1<y<(imgSize-1):
-            floodfill(x+1,y,floodfillValue,diff,imgSize,timeStep,f)
-            floodfill(x,y+1,floodfillValue,diff,imgSize,timeStep,f)
-            floodfill(x-1,y,floodfillValue,diff,imgSize,timeStep,f)
-            floodfill(x,y-1,floodfillValue,diff,imgSize,timeStep,f)
-            floodfill(x-1,y-1,floodfillValue,diff,imgSize,timeStep,f)
-            floodfill(x+1,y-1,floodfillValue,diff,imgSize,timeStep,f)
-            floodfill(x-1,y+1,floodfillValue,diff,imgSize,timeStep,f)
-            floodfill(x+1,y+1,floodfillValue,diff,imgSize,timeStep,f)
+def floodfill(x,y,floodfillValue,diff,imgSize):
+    if diff[x,y] >= floodfillValue and binaryMapTemp[x,y] ==0:
+        binaryMap[x,y] = 1
+        binaryMapTemp[x,y] = 1
+        binarMapNoFreq[x,y] += 1
+        if diff[x,y] > binaryMapPeakFlux[x,y]:
+            binaryMapPeakFlux[x,y] = diff[x,y]
+        binaryMapDistFromPC[x,y] = np.sqrt((x-(imgSize/2.0))**2.0+(y-(imgSize/2.0))**2.0)*0.0833333
+        if 1 < x < (imgSize-1) and 1 < y < (imgSize-1):
+            floodfill(x+1,y,floodfillValue,diff,imgSize)
+            floodfill(x,y+1,floodfillValue,diff,imgSize)
+            floodfill(x-1,y,floodfillValue,diff,imgSize)
+            floodfill(x,y-1,floodfillValue,diff,imgSize)
+            floodfill(x-1,y-1,floodfillValue,diff,imgSize)
+            floodfill(x+1,y-1,floodfillValue,diff,imgSize)
+            floodfill(x-1,y+1,floodfillValue,diff,imgSize)
+            floodfill(x+1,y+1,floodfillValue,diff,imgSize)
     return
 
 
-
 def main():
-	parser = ArgumentParser("Flagger", description="Flagges and plots DSNRS for RFI")
-	parser.add_argument('--obs', required=True, help="The observation id")
-	parser.add_argument('--freqChannels', required=True,type=int, help="Number of frequency channels to process")
-	parser.add_argument('--timeStep', required=True, type=int, help="The timestep at which RFISeeker runs")
-	parser.add_argument('--seedSigma', default=8, help="The sigma threshold for RFI seeding" )
-	parser.add_argument('--floodfillSigma', default=3, help="The sigma upto which flood fill happens")
-	parser.add_argument('--debug', default=False, type=bool,help="Prints out more values and shows figure if ran in debug mode")
-	parser.add_argument('--plotSatellites', default=False,type=bool,help="Plots the location of the starlink constellation in a different color")
-	parser.add_argument('--imgSize',required=False, type=int, help="The size of the images")
-	parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
-	parser.add_argument('--DSNRS', required=False,default=True,help="Disable/Enable DSNRS analysis")
-        parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset it frequency')
-	parser.add_argument('--evenTimeStepsOnly',default=False,type=bool, help="enable wokring with even timeSteps for observations like Alouette")
-        parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
-	args = parser.parse_args()
-	debug = args.debug
+    parser = ArgumentParser("Flagger", description="Flagges and plots DSNRS for RFI")
+    parser.add_argument('--obs', required=True, help="The observation id")
+    parser.add_argument('--freqChannels', default=768,type=int, help="Number of frequency channels to process")
+    parser.add_argument('--timeStep', required=True, type=int, help="The timestep at which RFISeeker runs")
+    parser.add_argument('--seedSigma', default=8, help="The sigma threshold for RFI seeding" )
+    parser.add_argument('--floodfillSigma', default=3, help="The sigma upto which flood fill happens")
+    parser.add_argument('--debug', default=False, type=bool,help="Prints out more values and shows figure if ran in debug mode")
+    parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
+    parser.add_argument('--DSNRS', required=False,default=True,help="Disable/Enable DSNRS analysis")
+    parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset it frequency')
+    parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
+    args = parser.parse_args()
+    debug = args.debug
+    timeStep = args.timeStep
 
-	hdu = fits.open(str(args.obs) + "-2m-" + str(args.timeStep) + "-" + str(0).zfill(4) + "-"+ str(args.ext)+".fits")
-        imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(args.timeStep) + "-" + str(0).zfill(4) + "-"+str(args.ext)+".fits")
-        plt = intialiseMatplotib(debug)
+    #The below obtains some preiliminary data and checks
+    imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(args.timeStep) + "-" + str(0).zfill(4) + "-"+str(args.ext)+".fits")
+    plt = intialiseMatplotib(debug)
+    #bashSyntax = "rm " + str(args.prefix) + "*"
+    #bashExecute = call(bashSyntax,shell=True)
 
-	bash1 = call("rm 7S*",shell=True)
+    #The below are the output arrays
+    global binaryMap
+    binaryMap = np.zeros((imgSize,imgSize))
+    global binaryMapNoPixels
+    binaryMapNoPixels = np.zeros((imgSize,imgSize))
+    global binarMapNoFreq
+    binarMapNoFreq = np.zeros((imgSize,imgSize))
+    global binaryMapPeakFlux
+    binaryMapPeakFlux = np.zeros((imgSize,imgSize))
+    global binaryMapDistFromPC
+    binaryMapDistFromPC = np.zeros((imgSize,imgSize))
 
-        #below array saves info of all the detections in a given timeStep
-        global binaryMap
-        binaryMap = np.zeros((imgSize,imgSize))
-	global binaryMapT
-	binaryMapT = np.zeros((imgSize,imgSize))
-	global binaryMapF
-	binaryMapF = np.zeros((imgSize,imgSize))
-	global binaryMapS
-	binaryMapS = np.zeros((imgSize,imgSize))
-	global binaryMapOutput
-	binaryMapOutput = np.zeros((imgSize,imgSize))
-        timeStep = args.timeStep
+    for f in range(args.freqChannels):
+        if timeStep in [0]:
+            break
+        f += args.deltaF
 
-        global thewriter
-	with open(str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv","w") as vsc:
-            thewriter = csv.writer(vsc)	
-	    thewriter.writerow(["freq","x","y","time"])
-            for f in range(args.freqChannels):
-                if timeStep in [0,1,2]:
-		    break	
-		    
-                if args.evenTimeStepsOnly is True:
-                    if not timeStep%2==0:
-		        break
-	        f += args.deltaF
+        if debug is True:
+            print("Working of frequency channel " + str(f+1) + "/" + str(args.freqChannels))
+        
+        hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+        hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
 
+        diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
+        std = np.std(diff)
+        # The below skips all flagged channels
+        if np.all(diff == 0):
+            continue
+
+        seedValue = float(args.seedSigma)*std
+        floodfillValue = float(args.floodfillSigma)*std
+
+        # The below checks if max point is greater than seed value
+        maxPoint = np.asarray(np.where(diff == np.max(diff)))
+        if diff[maxPoint[0][0],maxPoint[1][0]] < seedValue:
+            continue
+
+        global binaryMapTemp
+        binaryMapTemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
+
+        if debug is True:
+            print("RFI detected, seeding....")
+
+        floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)    
+        noOfPoints = int(np.count_nonzero(binaryMapTemp==1))
+        binaryMapNoPixels[np.where(binaryMapTemp==1)] = noOfPoints
+        contourPoints = np.asarray(np.where(binaryMapTemp ==1))
+
+        ## the below breaks out if the current rfi is already investigated
+        if len(contourPoints[0,:]) is 0:
+            continue
+
+        cutout = Cutout2D(diff, (maxPoint[1][0],maxPoint[0][0]), (100,100), wcs=wcs)
+        ax = plt.subplot(221, projection=cutout.wcs)
+        plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
+        plt.grid(color="black",linestyle='-')
+        plt.colorbar()
+        
+        if args.DSNRS is True:
+            snr_array = [None]*args.freqChannels
+            plt.subplot(222)
+            for f2 in range(args.freqChannels):
                 if debug is True:
-                    print("Working in frequency channel " + str(f+1) + "/" + str(args.freqChannels))
-
-                hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-	        if args.evenTimeStepsOnly is True:
-            	    hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+2) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-	        else:
-		    hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-                diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
-		global UTCTime
-		UTCTime = datetime.strptime(hdu2[0].header['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f')
-	        std = np.std(diff)
-                ## The below skips all flagged channels
-                if np.all(diff == 0):
+                    print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
+                hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
+                hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
+                diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
+                if np.all(diff2 == 0):
                     continue
+                noise_rms = np.sqrt(np.mean(diff2**2.0))
+                signal=0
+                for pointNo in range(len(contourPoints[0,:])):
+                    signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
+                    signal = signal/float(len(contourPoints[0,:]))
+                    snr_array[f2] = signal/noise_rms
+            i_array = np.linspace(72.335,103.015,args.freqChannels)
+            plt.plot(i_array,snr_array,color="black",linewidth=0.5)
+            plt.grid()
+        contourImg = Cutout2D(binaryMapTemp, (maxPoint[1][0],maxPoint[0][0]), (100,100),wcs=wcs)
+        ax = plt.subplot(223,projection=contourImg.wcs)
+        plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
+        plt.grid()
+        plt.colorbar()
+        ax = plt.subplot(224, projection=wcs)
+        plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
+        plt.grid()
+        plt.scatter(maxPoint[1][0],maxPoint[0][0],s=80,facecolors='none',edgecolors='lime')
+        if debug is True:
+            plt.show()
+    bashSyn1 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
+    bashExecute1 = call(bashSyn1,shell=True)
+    hdun = fits.PrimaryHDU(binaryMap,header=header)
+    hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
+    
+    ## The below makes the CSV file containing the meta data from the RFISeeker
+    bashSyn2 = "rm " + str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"
+    bashExecute2 = call(bashSyn2,shell=True)
+    with open(str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv","w") as vsc:
+        thewriter = csv.writer(vsc)
+        thewriter.writerow(["x","y","PeakFluxDensity","NoOfChannels","DistanceFromPhaseCenter","NoOfPixels"])
+        points = np.asarray(np.where(binaryMap != 0)).T
 
-		
-                ## The below calculates the seedValue and floodfillValue
-                seedValue = float(args.seedSigma)*std
-                floodfillValue = float(args.floodfillSigma)*std
-            
-	        ## The below finds the values that satisfy the seedValue
-                pointsInit = np.asarray(np.where(diff > seedValue)).T
-	        ## this section does the refinement of points ####
-	        points=[]
-	        pointsValue = diff[pointsInit[:,0],pointsInit[:,1]]
-	        #psfHDU = fits.open("1162810368-2m--" + str(f).zfill(4) + "-psf.fits")
-	        points = mask(pointsInit,pointsValue,imgSize)
-	    
-	        ############################################################
-
-	    
-                for counter2 in range(len(points)):
-                    plt.clf()
-		    global binaryMaptemp
-                    binaryMaptemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
-
-                    if debug is True:
-                        print("RFI detected, seeding .......")
-
-                    currentPoint = points[counter2]
-		    if binaryMap[currentPoint[0],currentPoint[1]] ==0:
-		        binaryMapS[currentPoint[0],currentPoint[1]] = timeStep
-                    floodfill(currentPoint[0],currentPoint[1],floodfillValue,diff,imgSize,timeStep,f)
-                    contourPoints = np.asarray(np.where(binaryMaptemp ==1))
-
-                    ## the below breaks out if the current rfi is already been investigated into
-                    if len(contourPoints[0,:]) is 0:
-                        continue
-                
-                
-                    cutout = Cutout2D(diff, (currentPoint[1],currentPoint[0]), (100,100), wcs=wcs)
-                    ax = plt.subplot(221, projection=cutout.wcs)
-                    plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
-                    plt.grid(color="black",linestyle='-')
-                    plt.colorbar()
-
-                    snr_array = [None]*args.freqChannels
-                    numberofrfi = 0 
-                    if args.DSNRS is True:
-                        plt.subplot(222)
-                
-                        for f2 in range(args.freqChannels):
-
-                            if debug is True:
-                                print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
-
-                            hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-			    if args.evenTimeStepsOnly is True:
-                                hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+2) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                            else:
-			        hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                            diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
-			
-			    if np.all(diff2 == 0):
-		                continue
-
-                            noise_rms = np.sqrt(np.mean(diff2**2.0))
-
-                            signal=0
-                            for pointNo in range(len(contourPoints[0,:])):
-                                signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
-
-                            	signal = signal/float(len(contourPoints[0,:]))
-                            	snr_array[f2] = signal/noise_rms
-                        i_array = np.linspace(72.335,103.015,args.freqChannels)
-                        plt.plot(i_array,snr_array,color="black",linewidth=0.5)
-                        plt.grid()
-
-                    ## the below section plots the contour
-                    contourImg = Cutout2D(binaryMaptemp, (currentPoint[1],currentPoint[0]), (100,100),wcs=wcs)
-                    ax = plt.subplot(223,projection=contourImg.wcs)
-                    plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
-                    plt.grid()
-                    plt.colorbar()
-
-                    ax = plt.subplot(224, projection=wcs)
-                    plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
-                    plt.grid()
-                    plt.scatter(currentPoint[1],currentPoint[0],s=80,facecolors='none',edgecolors='lime')
-                    if debug is True:
-                        plt.show()
+        for p in points:
+            x,y = p
+            peakFluxDensity = binaryMapPeakFlux[x,y]
+            NoOfChannels = binarMapNoFreq[x,y]
+            DistanceFromPhaseCenter = binaryMapDistFromPC[x,y]
+            NoOfPixels = binaryMapNoPixels[x,y]
+            line = [x,y,peakFluxDensity,NoOfChannels,DistanceFromPhaseCenter,NoOfPixels]
+            thewriter.writerow(line)
 
 
-                    plt.savefig(str(args.prefix) + "Sigma" + "LOWRES_RFISeeker_timeStep" + str(timeStep).zfill(4) + "_atFreq"+ str(f).zfill(4) + "_andRFINo" + str(numberofrfi).zfill(2) + ".png")
-                    plt.clf()
-		    numberofrfi +=1	
-
-            hdun = fits.PrimaryHDU(binaryMap,header=hdu[0].header)
-            hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
-	    #hdun2 = fits.PrimaryHDU(binaryMapT,header=hdu[0].header)
-	    #hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapT-t" + str(timeStep).zfill(4) + ".fits")
-	    #hdun3 = fits.PrimaryHDU(binaryMapF,header=hdu[0].header)
-	    #hdun3.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapF-t" + str(timeStep).zfill(4) + ".fits")
-	    hdun4 = fits.PrimaryHDU(binaryMapS,header=hdu[0].header)
-	    hdun4.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapS-t" + str(timeStep).zfill(4) + ".fits")
 
 if __name__ =="__main__":
     main()

@@ -22,6 +22,245 @@ import matplotlib.pyplot as plt
 
 plt.style.use('dark_background')
 
+#font = {'family' : 'normal','weight' : 'bold','size'   : 6}
+font = {'family' : 'normal','size'   : 2}
+
+mwa = ephem.Observer()
+mwa.lon = '116:40:14.93485'
+mwa.lat = '-26:42:11.94986'
+mwa.elevation = 377.827 #from sea level
+globalData = np.zeros((1400,1400))
+LeoData = np.zeros((1400,1400))
+#UTCtime = datetime.time
+for i in range(56):
+    try:
+        hdu = fits.open("6Sigma3floodfillSigmaRFIBinaryMap-t" +str(i).zfill(4) +  ".fits")
+    except:
+        continue
+    globalData += hdu[0].data
+    
+    UTCtime = datetime.strptime(hdu[0].header['DATE-OBS'][:-2], '%Y-%m-%dT%H:%M:%S')
+    print(UTCtime)
+    wcs = WCS(hdu[0].header, naxis=2)
+    ax = plt.subplot(111, projection=wcs)
+      
+    timeDela = np.linspace(-100,100,200)
+
+    t = 0
+    #print(t)
+    try:
+        time = UTCtime + timedelta(seconds=t)
+        mwa.date = time
+    except:
+        continue
+    sat_id_array = []
+    f = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/LEOTLE.txt")
+    line = f.readline()
+    counter = 1
+    line1 = "starlink"
+    labelPoints = []
+    while line:
+        #print(counter)
+        if counter%2 ==1:
+            line2 = line
+        else:
+            line3 = line
+            satID = int(line2[2] + line2[3] + line2[4] + line2[5] + line2[6] )
+            if satID not in sat_id_array:
+                sat_id_array.append(satID)
+                sat = ephem.readtle(str(line1), str(line2), str(line3))
+                sat.compute(mwa)
+                x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
+                #if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                #    plt.text(x,y, str(satID) + "r" + str(int(float(sat.range)/1000)+ "s" + str(local_RCS)) ,color='black',**font)
+		local_RCS = "000"
+		if sat.range < 1000000 and radius <= 250:
+                    print("True")
+                    w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
+                    rline = w.readline()
+                    local_RCS = 0
+                
+                    while rline:
+                        local_ID =int( rline[13] + rline[14] + rline[15] + rline[16] + rline[17])
+                        if satID == local_ID:
+                            local_RCS = str(rline[119] + rline[120] + rline[121] + rline[122] + rline[123] + rline[124] + rline[125] + rline[126])
+                            local_RCS = local_RCS.replace(" ", "")
+                        rline = w.readline()
+                        #print(j)
+                    
+                    print(local_RCS) 
+                    if float(local_RCS) >= 0.785 and (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                        print("plotting and id is " + str(satID) + " and range is " + str(sat.range/1000.0))
+                        
+                        LeoData[int(y),int(x)] =2
+                        LeoData[int(y+1),int(x)] =2
+                        LeoData[int(y),int(x+1)] =2
+                        LeoData[int(y-1),int(x)] =2
+                        LeoData[int(y),int(x-1)] =2
+                    elif (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                        LeoData[int(y),int(x)] =1
+                        LeoData[int(y+1),int(x)] =1
+                        LeoData[int(y),int(x+1)] =1
+                        LeoData[int(y-1),int(x)] =1
+                        LeoData[int(y),int(x-1)] =1
+                elif (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                    LeoData[int(y),int(x)] =1
+                    LeoData[int(y+1),int(x)] =1
+                    LeoData[int(y),int(x+1)] =1
+                    LeoData[int(y-1),int(x)] =1
+                    LeoData[int(y),int(x-1)] =1
+		if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+		    plt.text(x,y, str(satID) + "r" + str(int(float(sat.range)/1000))+ "s" + str(local_RCS) ,color='black',**font)
+        counter +=1
+        line = f.readline()
+
+    sat_id_array = []
+    f = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/MEOTLE.txt")
+    line = f.readline()
+    counter = 1
+    line1 = "starlink"
+    while line:
+        #print(counter)
+        if counter%2 ==1:
+            line2 = line
+        else:
+            line3 = line
+            satID = int(line2[2] + line2[3] + line2[4] + line2[5] + line2[6] )
+            if satID not in sat_id_array:
+                sat_id_array.append(satID)
+                sat = ephem.readtle(str(line1), str(line2), str(line3))
+                sat.compute(mwa)
+                x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
+                #if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+		local_RCS = "000"
+                #    plt.text(x,y, str(satID) + "-r" + str(int(float(sat.range)/1000)) ,color='black',**font)
+		if sat.range < 1000000 and radius <= 250:
+                    w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
+                    rline = w.readline()
+                    local_RCS = 0
+
+                    while rline:
+                        local_ID =int( rline[13] + rline[14] + rline[15] + rline[16] + rline[17])
+                        if satID == local_ID:
+                            local_RCS = str(rline[119] + rline[120] + rline[121] + rline[122] + rline[123] + rline[124] + rline[125] + rline[126])
+                            local_RCS = local_RCS.replace(" ", "")
+                        rline = w.readline()
+                        #print(j)
+
+
+                    if local_RCS >= 0.785 and (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+			print("plotting and id is " + str(satID) + " and range is " + str(sat.range/1000.0))
+                        LeoData[int(y),int(x)] =2
+                        LeoData[int(y+1),int(x)] =2
+                        LeoData[int(y),int(x+1)] =2
+                        LeoData[int(y-1),int(x)] =2
+                        LeoData[int(y),int(x-1)] =2
+                    elif (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                        LeoData[int(y),int(x)] =1
+                        LeoData[int(y+1),int(x)] =1
+                        LeoData[int(y),int(x+1)] =1
+                        LeoData[int(y-1),int(x)] =1
+                        LeoData[int(y),int(x-1)] =1
+                elif (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                    LeoData[int(y),int(x)] =1
+                    LeoData[int(y+1),int(x)] =1
+                    LeoData[int(y),int(x+1)] =1
+                    LeoData[int(y-1),int(x)] =1
+                    LeoData[int(y),int(x-1)] =1
+		if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+		    plt.text(x,y, str(satID) + "r" + str(int(float(sat.range)/1000))+ "s" + str(local_RCS) ,color='black',**font)
+        counter +=1
+        line = f.readline()
+    sat_id_array = []
+    f = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/HEOTLE.txt")
+    line = f.readline()
+    counter = 1
+    line1 = "starlink"
+    while line:
+        #print(counter)
+        if counter%2 ==1:
+            line2 = line
+        else:
+            line3 = line
+            satID = int(line2[2] + line2[3] + line2[4] + line2[5] + line2[6] )
+            if satID not in sat_id_array:
+                sat_id_array.append(satID)
+                sat = ephem.readtle(str(line1), str(line2), str(line3))
+                sat.compute(mwa)
+                x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
+                local_RCS = "000"
+                radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
+                #if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                #    plt.text(x,y, str(satID) + "-r" + str(int(float(sat.range)/1000)) ,color='black',**font)
+		if sat.range < 1000000 and radius <= 250:
+                    w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
+                    rline = w.readline()
+                    local_RCS = 0
+
+                    while rline:
+                        local_ID =int( rline[13] + rline[14] + rline[15] + rline[16] + rline[17])
+                        if satID == local_ID:
+                            local_RCS = str(rline[119] + rline[120] + rline[121] + rline[122] + rline[123] + rline[124] + rline[125] + rline[126])
+                            local_RCS = local_RCS.replace(" ", "")
+                        rline = w.readline()
+                        #print(j)
+
+
+                    if local_RCS >= 0.785 and (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+			print("plotting and id is " + str(satID) + " and range is " + str(sat.range/1000.0))
+                        LeoData[int(y),int(x)] =2
+                        LeoData[int(y+1),int(x)] =2
+                        LeoData[int(y),int(x+1)] =2
+                        LeoData[int(y-1),int(x)] =2
+                        LeoData[int(y),int(x-1)] =2
+                    elif (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                        LeoData[int(y),int(x)] =1
+                        LeoData[int(y+1),int(x)] =1
+                        LeoData[int(y),int(x+1)] =1
+                        LeoData[int(y-1),int(x)] =1
+                        LeoData[int(y),int(x-1)] =1
+                elif (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                    LeoData[int(y),int(x)] =1
+                    LeoData[int(y+1),int(x)] =1
+                    LeoData[int(y),int(x+1)] =1
+                    LeoData[int(y-1),int(x)] =1
+                    LeoData[int(y),int(x-1)] =1
+		if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+		    plt.text(x,y, str(satID) + "r" + str(int(float(sat.range)/1000))+ "s" + str(local_RCS) ,color='black',**font)
+        counter +=1
+        line = f.readline()
+
+
+
+    #globalData = np.where(globalData>0,-8,globalData)
+    globalData = np.ma.masked_where(globalData >0, globalData)
+    cmap = plt.cm.Purples
+    cmap.set_bad(color='red')
+    Points1 = np.asarray(np.where(LeoData==1))
+    Points2 = np.asarray(np.where(LeoData==2))
+    plt.imshow(globalData, cmap=cmap, origin='lower')
+    try:
+        ax.scatter(Points1[1,:], Points1[0,:],marker='o',c='blue', s=0.01)
+        ax.scatter(Points2[1,:], Points2[0,:],marker='o',c='lime', s=0.01)
+    except:
+        print("hola")
+    plt.grid(color='blue',linestyle='-',linewidth='1')
+    plt.title(UTCtime)
+    plt.xlabel("RA (Degrees)")
+    plt.ylabel("DEC (Degrees)")
+    
+    plt.savefig("timeLapseWITHLOG" + str(i).zfill(4) + ".png",dpi=1000)
+
+
+
+
+################################################################
+
+
+plt.style.use('dark_background')
+
 
 mwa = ephem.Observer()
 mwa.lon = '116:40:14.93485'
@@ -45,7 +284,7 @@ for i in range(56):
     timeDela = np.linspace(-100,100,200)
 
     t = 0
-    print(t)
+    #print(t)
     try:
         time = UTCtime + timedelta(seconds=t)
         mwa.date = time
@@ -56,8 +295,9 @@ for i in range(56):
     line = f.readline()
     counter = 1
     line1 = "starlink"
+    labelPoints = []
     while line:
-        print(counter)
+        #print(counter)
         if counter%2 ==1:
             line2 = line
         else:
@@ -69,6 +309,8 @@ for i in range(56):
                 sat.compute(mwa)
                 x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
                 radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
+                #if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                #    plt.text(y,x, str(satID) + "-r" + str(sat.range) )
 		if sat.range < 1000000 and radius <= 250:
                     print("True")
                     w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
@@ -125,6 +367,8 @@ for i in range(56):
                 sat.compute(mwa)
                 x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
                 radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
+                #if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                #    plt.text(y,x, str(satID) + "-r" + str(sat.range) )
 		if sat.range < 1000000 and radius <= 250:
                     w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
                     rline = w.readline()
@@ -140,6 +384,7 @@ for i in range(56):
 
 
                     if local_RCS >= 0.785 and (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+			print("plotting and id is " + str(satID) + " and range is " + str(sat.range/1000.0))
                         LeoData[int(y),int(x)] =2
                         LeoData[int(y+1),int(x)] =2
                         LeoData[int(y),int(x+1)] =2
@@ -178,6 +423,8 @@ for i in range(56):
                 x, y = wcs.all_world2pix([[np.degrees(sat.ra.real), np.degrees(sat.dec.real)]], 1)[0]
                 
                 radius = np.sqrt((x-700)**2.0+(y-700)**2.0)
+                #if (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+                #    plt.text(y,x, str(satID) + "-r" + str(sat.range) )
 		if sat.range < 1000000 and radius <= 250:
                     w = open("/astro/mwasci/sprabu/satellites/MWA-fast-image-transients/HexFMSurveySolution/RCS.txt")
                     rline = w.readline()
@@ -193,6 +440,7 @@ for i in range(56):
 
 
                     if local_RCS >= 0.785 and (5 <= x <= (1400-5)) and (5<= y < (1400-5)):
+			print("plotting and id is " + str(satID) + " and range is " + str(sat.range/1000.0))
                         LeoData[int(y),int(x)] =2
                         LeoData[int(y+1),int(x)] =2
                         LeoData[int(y),int(x+1)] =2
@@ -233,5 +481,7 @@ for i in range(56):
     plt.ylabel("DEC (Degrees)")
     
     plt.savefig("timeLapse" + str(i).zfill(4) + ".png")
+
+
 
 
