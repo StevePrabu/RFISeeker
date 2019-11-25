@@ -10,15 +10,16 @@ import ephem
 import time
 from scipy.stats import skew
 from datetime import datetime, timedelta
-from scipy import stats
-from scipdey.stats import norm
-from scipy.optimize import leastsq,curve_fit,minimize
-from scipy import special
-from scipy.signal import find_peaks
+#from scipy import stats
+#from scipdey.stats import norm
+#from scipy.optimize import leastsq,curve_fit,minimize
+#from scipy import special
+#from scipy.signal import find_peaks
 import csv
 from subprocess import call
 import time
 from datetime import datetime, timedelta
+from scipy.spatial import distance
 ##custom 
 from mwassa.imginfo import info
 from mwassa.curvefitting import skew_norm_pdf, reqCDF, cumulative_distribution_function, getSeedValue, getFloodfillValue
@@ -112,8 +113,9 @@ def main():
             print("RFI detected, seeding....")
 
         floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)    
-        noOfPoints = int(np.count_nonzero(binaryMapTemp==1))
-        binaryMapNoPixels[np.where(binaryMapTemp==1)] = noOfPoints
+        testPoints = np.asarray(np.where(binaryMapTemp==1)).T
+	Maxdistance = np.max(distance.cdist(testPoints,testPoints))
+        binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
         contourPoints = np.asarray(np.where(binaryMapTemp ==1))
 
         ## the below breaks out if the current rfi is already investigated
