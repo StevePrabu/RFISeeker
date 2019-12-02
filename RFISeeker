@@ -163,6 +163,10 @@ def main():
     bashExecute1 = call(bashSyn1,shell=True)
     hdun = fits.PrimaryHDU(binaryMap,header=header)
     hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
+    bashSyn3 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits"
+    bashExecute3 = call(bashSyn3,shell=True)
+    hdun2 = fits.PrimaryHDU(binaryMapPeakFlux,header=header)
+    hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits")
     
     ## The below makes the CSV file containing the meta data from the RFISeeker
     bashSyn2 = "rm " + str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"
