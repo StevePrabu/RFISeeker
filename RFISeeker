@@ -159,6 +159,8 @@ def main():
         plt.scatter(maxPoint[1][0],maxPoint[0][0],s=80,facecolors='none',edgecolors='lime')
         if debug is True:
             plt.show()
+	else:
+	    plt.savefig( str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + "_atFreq" + str(f).zfill(4) + ".png")
     bashSyn1 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
     bashExecute1 = call(bashSyn1,shell=True)
     hdun = fits.PrimaryHDU(binaryMap,header=header)
