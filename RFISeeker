@@ -8,7 +8,7 @@ import os.path
 from argparse import ArgumentParser
 import ephem
 import time
-from scipy.stats import skew
+#from scipy.stats import skew
 from datetime import datetime, timedelta
 #from scipy import stats
 #from scipdey.stats import norm
@@ -21,9 +21,9 @@ import time
 from datetime import datetime, timedelta
 from scipy.spatial import distance
 ##custom 
-#from mwassa.imginfo import info
+from mwassa.imginfo import info
 #from mwassa.curvefitting import skew_norm_pdf, reqCDF, cumulative_distribution_function, getSeedValue, getFloodfillValue
-#from mwassa.plotting import intialiseMatplotib
+from mwassa.plotting import intialiseMatplotib
 #from mwassa.adaptiveMasking import mask
 
 
