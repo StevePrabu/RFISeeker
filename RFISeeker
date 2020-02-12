@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python 
 from __future__ import division
 from astropy.io import fits
 import numpy as np
@@ -28,6 +28,7 @@ from mwassa.plotting import intialiseMatplotib
 
 
 def floodfill(x,y,floodfillValue,diff,imgSize):
+    
     if diff[x,y] >= floodfillValue and binaryMapTemp[x,y] ==0:
         binaryMap[x,y] = 1
         binaryMapTemp[x,y] = 1
@@ -111,7 +112,6 @@ def main():
 
         if debug is True:
             print("RFI detected, seeding....")
-
         floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)    
         testPoints = np.asarray(np.where(binaryMapTemp==1)).T
 	Maxdistance = np.max(distance.cdist(testPoints,testPoints))
