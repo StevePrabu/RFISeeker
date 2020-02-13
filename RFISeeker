@@ -27,9 +27,10 @@ from mwassa.plotting import intialiseMatplotib
 #from mwassa.adaptiveMasking import mask
 
 
-def floodfill(x,y,floodfillValue,diff,imgSize):
-    
-    if diff[x,y] >= floodfillValue and binaryMapTemp[x,y] ==0:
+
+def floodfill(x,y,floodfillValue,diff,imgSize,rc):
+    rc += 1
+    if diff[x,y] >= floodfillValue and binaryMapTemp[x,y] ==0 and rc <=100:
         binaryMap[x,y] = 1
         binaryMapTemp[x,y] = 1
         binarMapNoFreq[x,y] += 1
@@ -37,14 +38,14 @@ def floodfill(x,y,floodfillValue,diff,imgSize):
             binaryMapPeakFlux[x,y] = diff[x,y]
         binaryMapDistFromPC[x,y] = np.sqrt((x-(imgSize/2.0))**2.0+(y-(imgSize/2.0))**2.0)*0.0833333
         if 1 < x < (imgSize-1) and 1 < y < (imgSize-1):
-            floodfill(x+1,y,floodfillValue,diff,imgSize)
-            floodfill(x,y+1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y,floodfillValue,diff,imgSize)
-            floodfill(x,y-1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y-1,floodfillValue,diff,imgSize)
-            floodfill(x+1,y-1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y+1,floodfillValue,diff,imgSize)
-            floodfill(x+1,y+1,floodfillValue,diff,imgSize)
+            floodfill(x+1,y,floodfillValue,diff,imgSize,rc)
+            floodfill(x,y+1,floodfillValue,diff,imgSize,rc)
+            floodfill(x-1,y,floodfillValue,diff,imgSize,rc)
+            floodfill(x,y-1,floodfillValue,diff,imgSize,rc)
+            floodfill(x-1,y-1,floodfillValue,diff,imgSize,rc)
+            floodfill(x+1,y-1,floodfillValue,diff,imgSize,rc)
+            floodfill(x-1,y+1,floodfillValue,diff,imgSize,rc)
+            floodfill(x+1,y+1,floodfillValue,diff,imgSize,rc)
     return
 
 
@@ -103,64 +104,63 @@ def main():
         floodfillValue = float(args.floodfillSigma)*std
 
         # The below checks if max point is greater than seed value
-        maxPoint = np.asarray(np.where(diff == np.max(diff)))
-        if diff[maxPoint[0][0],maxPoint[1][0]] < seedValue:
+        list_of_points = np.asarray(np.where(diff >= seedValue))
+        if str(list_of_points) == "[]":
             continue
-
-        global binaryMapTemp
-        binaryMapTemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
-
-        if debug is True:
-            print("RFI detected, seeding....")
-        floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)    
-        testPoints = np.asarray(np.where(binaryMapTemp==1)).T
-	Maxdistance = np.max(distance.cdist(testPoints,testPoints))
-        binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
-        contourPoints = np.asarray(np.where(binaryMapTemp ==1))
-
-        ## the below breaks out if the current rfi is already investigated
-        if len(contourPoints[0,:]) is 0:
-            continue
-
-        cutout = Cutout2D(diff, (maxPoint[1][0],maxPoint[0][0]), (100,100), wcs=wcs)
-        ax = plt.subplot(221, projection=cutout.wcs)
-        plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
-        plt.grid(color="black",linestyle='-')
-        plt.colorbar()
         
-        if args.DSNRS is True:
-            snr_array = [None]*args.freqChannels
-            plt.subplot(222)
-            for f2 in range(args.freqChannels):
-                if debug is True:
-                    print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
-                hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
-                if np.all(diff2 == 0):
-                    continue
-                noise_rms = np.sqrt(np.mean(diff2**2.0))
-                signal=0
-                for pointNo in range(len(contourPoints[0,:])):
-                    signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
-                    signal = signal/float(len(contourPoints[0,:]))
-                    snr_array[f2] = signal/noise_rms
-            i_array = np.linspace(72.335,103.015,args.freqChannels)
-            plt.plot(i_array,snr_array,color="black",linewidth=0.5)
-            plt.grid()
-        contourImg = Cutout2D(binaryMapTemp, (maxPoint[1][0],maxPoint[0][0]), (100,100),wcs=wcs)
-        ax = plt.subplot(223,projection=contourImg.wcs)
-        plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
-        plt.grid()
-        plt.colorbar()
-        ax = plt.subplot(224, projection=wcs)
-        plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
-        plt.grid()
-        plt.scatter(maxPoint[1][0],maxPoint[0][0],s=80,facecolors='none',edgecolors='lime')
-        if debug is True:
-            plt.show()
-	else:
-	    plt.savefig( str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + "_atFreq" + str(f).zfill(4) + ".png")
+        for maxPoint in list_of_points:
+            if str(list_of_points.shape) == "(2, 1)":
+                maxPoint = list_of_points
+            global binaryMapTemp
+            binaryMapTemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
+
+            if debug is True:
+                print("RFI detected, seeding....")
+            rc = 0
+            floodfill(maxPoint[0], maxPoint[1], floodfillValue,diff , imgSize,rc)    
+            testPoints = np.asarray(np.where(binaryMapTemp==1)).T
+	    Maxdistance = 0
+            binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
+            contourPoints = np.asarray(np.where(binaryMapTemp ==1))
+
+            ## the below breaks out if the current rfi is already investigated
+            if len(contourPoints[0,:]) is 0:
+                continue
+
+        
+            if args.DSNRS is True:
+                snr_array = [None]*args.freqChannels
+                #plt.subplot(222)
+                for f2 in range(args.freqChannels):
+                    if debug is True:
+                        print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
+                    hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
+                    hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
+                    diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
+                    if np.all(diff2 == 0):
+                        continue
+                    noise_rms = np.sqrt(np.mean(diff2**2.0))
+                    signal=0
+                    for pointNo in range(len(contourPoints[0,:])):
+                        signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
+                        signal = signal/float(len(contourPoints[0,:]))
+                        snr_array[f2] = signal/noise_rms
+                i_array = np.linspace(72.335,103.015,args.freqChannels)
+                #plt.plot(i_array,snr_array,color="black",linewidth=0.5)
+                #plt.grid()
+            #contourImg = Cutout2D(binaryMapTemp, (maxPoint[1][0],maxPoint[0][0]), (100,100),wcs=wcs)
+            #ax = plt.subplot(223,projection=contourImg.wcs)
+            #plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
+            #plt.grid()
+            #plt.colorbar()
+            #ax = plt.subplot(224, projection=wcs)
+            #plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
+            #plt.grid()
+            #plt.scatter(maxPoint[1][0],maxPoint[0][0],s=80,facecolors='none',edgecolors='lime')
+            #if debug is True:
+            #    plt.show()
+	    #else:
+	    #    plt.savefig( str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + "_atFreq" + str(f).zfill(4) + ".png")
     bashSyn1 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
     bashExecute1 = call(bashSyn1,shell=True)
     hdun = fits.PrimaryHDU(binaryMap,header=header)
