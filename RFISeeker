@@ -27,9 +27,10 @@ from mwassa.plotting import intialiseMatplotib
 #from mwassa.adaptiveMasking import mask
 
 
-def floodfill(x,y,floodfillValue,diff,imgSize):
+def floodfill(x,y,floodfillValue,diff,imgSize,rc):
     
-    if diff[x,y] >= floodfillValue and binaryMapTemp[x,y] ==0:
+    if diff[x,y] >= floodfillValue and binaryMapTemp[x,y] ==0 and rc <200:
+        rc += 1
         binaryMap[x,y] = 1
         binaryMapTemp[x,y] = 1
         binarMapNoFreq[x,y] += 1
@@ -37,14 +38,14 @@ def floodfill(x,y,floodfillValue,diff,imgSize):
             binaryMapPeakFlux[x,y] = diff[x,y]
         binaryMapDistFromPC[x,y] = np.sqrt((x-(imgSize/2.0))**2.0+(y-(imgSize/2.0))**2.0)*0.0833333
         if 1 < x < (imgSize-1) and 1 < y < (imgSize-1):
-            floodfill(x+1,y,floodfillValue,diff,imgSize)
-            floodfill(x,y+1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y,floodfillValue,diff,imgSize)
-            floodfill(x,y-1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y-1,floodfillValue,diff,imgSize)
-            floodfill(x+1,y-1,floodfillValue,diff,imgSize)
-            floodfill(x-1,y+1,floodfillValue,diff,imgSize)
-            floodfill(x+1,y+1,floodfillValue,diff,imgSize)
+            floodfill(x+1,y,floodfillValue,diff,imgSize,rc)
+            floodfill(x,y+1,floodfillValue,diff,imgSize,rc)
+            floodfill(x-1,y,floodfillValue,diff,imgSize,rc)
+            floodfill(x,y-1,floodfillValue,diff,imgSize,rc)
+            floodfill(x-1,y-1,floodfillValue,diff,imgSize,rc)
+            floodfill(x+1,y-1,floodfillValue,diff,imgSize,rc)
+            floodfill(x-1,y+1,floodfillValue,diff,imgSize,rc)
+            floodfill(x+1,y+1,floodfillValue,diff,imgSize,rc)
     return
 
 
@@ -112,7 +113,8 @@ def main():
 
         if debug is True:
             print("RFI detected, seeding....")
-        floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)    
+        rc = 0
+        floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize,rc)    
         testPoints = np.asarray(np.where(binaryMapTemp==1)).T
 	Maxdistance = np.max(distance.cdist(testPoints,testPoints))
         binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
