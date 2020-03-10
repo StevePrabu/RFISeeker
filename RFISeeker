@@ -58,7 +58,7 @@ def main():
     parser.add_argument('--floodfillSigma', default=3, help="The sigma upto which flood fill happens")
     parser.add_argument('--debug', default=False, type=bool,help="Prints out more values and shows figure if ran in debug mode")
     parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
-    parser.add_argument('--DSNRS', required=False,default=True,help="Disable/Enable DSNRS analysis")
+    parser.add_argument('--DSNRS',default=True,help="Disable/Enable DSNRS analysis")
     parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset it frequency')
     parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
     args = parser.parse_args()
@@ -82,6 +82,8 @@ def main():
     binaryMapPeakFlux = np.zeros((imgSize,imgSize))
     global binaryMapDistFromPC
     binaryMapDistFromPC = np.zeros((imgSize,imgSize))
+    global binaryMapSeed
+    binaryMapSeed = np.zeros((imgSize,imgSize))
 
     for f in range(args.freqChannels):
         if timeStep in [0]:
@@ -114,6 +116,8 @@ def main():
         if debug is True:
             print("RFI detected, seeding....")
         rc = 0
+        
+        binaryMapSeed[maxPoint[0][0], maxPoint[1][0]] = 1
         floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize,rc)    
         testPoints = np.asarray(np.where(binaryMapTemp==1)).T
 	Maxdistance = np.max(distance.cdist(testPoints,testPoints))
@@ -129,8 +133,8 @@ def main():
         plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
         plt.grid(color="black",linestyle='-')
         plt.colorbar()
-        
-        if args.DSNRS is True:
+        z = 0  
+        if z == 0:
             snr_array = [None]*args.freqChannels
             plt.subplot(222)
             for f2 in range(args.freqChannels):
@@ -151,11 +155,11 @@ def main():
             plt.plot(i_array,snr_array,color="black",linewidth=0.5)
             plt.grid()
         contourImg = Cutout2D(binaryMapTemp, (maxPoint[1][0],maxPoint[0][0]), (100,100),wcs=wcs)
-        ax = plt.subplot(223,projection=contourImg.wcs)
+        ax3 = plt.subplot(223,projection=contourImg.wcs)
         plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
         plt.grid()
         plt.colorbar()
-        ax = plt.subplot(224, projection=wcs)
+        ax4 = plt.subplot(224, projection=wcs)
         plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
         plt.grid()
         plt.scatter(maxPoint[1][0],maxPoint[0][0],s=80,facecolors='none',edgecolors='lime')
@@ -163,6 +167,7 @@ def main():
             plt.show()
 	else:
 	    plt.savefig( str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + "_atFreq" + str(f).zfill(4) + ".png")
+            plt.clf()
     bashSyn1 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
     bashExecute1 = call(bashSyn1,shell=True)
     hdun = fits.PrimaryHDU(binaryMap,header=header)
@@ -171,7 +176,11 @@ def main():
     bashExecute3 = call(bashSyn3,shell=True)
     hdun2 = fits.PrimaryHDU(binaryMapPeakFlux,header=header)
     hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits")
-    
+    bashSyn4  = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits"       bashExecute4 = call(bashSyn4,shell=True)
+    hdu3 =  fits.PrimaryHDU(binaryMapSeed.header=header)
+    hdu3.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits")
+ 
+
     ## The below makes the CSV file containing the meta data from the RFISeeker
     bashSyn2 = "rm " + str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"
     bashExecute2 = call(bashSyn2,shell=True)
