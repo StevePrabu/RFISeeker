@@ -1,4 +1,4 @@
-#!/usr/bin/python 
+#!/usr/bin/env python
 from __future__ import division
 from __future__ import print_function
 from astropy.io import fits
@@ -14,89 +14,203 @@ from subprocess import call
 from scipy.spatial import distance
 from mwassa.imginfo import info
 from mwassa.plotting import intialiseMatplotib
+from warnings import filterwarnings
+filterwarnings("ignore")
+import sys
+from tqdm import tqdm
+import scipy.optimize as opt
+from astropy.wcs import WCS
+from astropy.coordinates import AltAz, SkyCoord, EarthLocation
+import astropy.units as u
+
+pos = EarthLocation(lon=116.67083333*u.deg, lat=-26.70331941*u.deg, height=377.827*u.m)
+
+def eprint(*args, **kwargs):
+    """
+    prints function in stderr so that the print is logged
+    """
+    print(*args, file=sys.stderr, **kwargs)
 
 
-def floodfill(xs, ys ,floodfillValue, diff, imgSize):
+def floodfill(xs, ys, floodfillValue, diff, streak):
     """
-    This function finds all adjacent pixels over the provided floodfill value
+    performs the forest fire algorithm to source find satellites
     """
+
     q = []
     q.append([xs, ys])
 
-    def checkValid(x,y, floodfillValue):
-        """
-        checks if the pixel is near the edge of the image
-        """
+    while q:
+        
+        x, y = q.pop()
+        binaryMap[x, y] = 1
+        binaryMapTemp[x, y] = 1
+        binarMapNoFreq[x, y] += 1
 
-        output = False
 
+        if streak == "head":
+            if diff[x,y] > binaryMapPeakFlux[x,y]:
+                binaryMapPeakFlux[x,y] = diff[x,y]
+        elif streak == "Tail":
+            if diff[x,y] < binaryMapPeakFlux[x,y]:
+                binaryMapPeakFlux[x,y] = diff[x,y]
+
+        
+        if checkValid(x+1, y, floodfillValue, streak, diff):
+            q.append([x+1, y])
+        
+        if checkValid(x, y+1, floodfillValue, streak, diff):
+            q.append([x, y+1])
+        
+        if checkValid(x-1, y, floodfillValue, streak, diff):
+            q.append([x-1, y])
+
+        if checkValid(x, y-1, floodfillValue, streak, diff):
+            q.append([x, y-1])
+
+        if checkValid(x+1, y+1, floodfillValue, streak, diff):
+            q.append([x+1, y+1])
+
+        if checkValid(x+1, y-1, floodfillValue, streak, diff):
+            q.append([x+1, y-1])
+
+        if checkValid(x-1, y-1, floodfillValue, streak, diff):
+            q.append([x-1, y-1])
+
+        if checkValid(x-1, y+1, floodfillValue, streak, diff):
+            q.append([x-1, y+1])
+    
+    return
+
+def checkValid(x, y, floodfillValue, streak, diff):
+    """
+    checks the validy of the pixel
+    """
+
+    output = False
+
+    if streak == "head":
         if 1 < x < (imgSize-1) and 1 < y < (imgSize-1) and  diff[x,y] >= floodfillValue and binaryMapTemp[x,y] == 0:
             output = True
 
-        return output
-        
+    elif streak == "Tail":
+        if 1 < x < (imgSize-1) and 1 < y < (imgSize-1) and  diff[x,y] <= floodfillValue and binaryMapTemp[x,y] == 0:
+            output = True
 
-    while q:
-        x, y = q.pop()
-        if diff[x, y] >= floodfillValue and binaryMapTemp[x, y] == 0:
-            binaryMap[x, y] = 1
-            binaryMapTemp[x, y] = 1
-            binarMapNoFreq[x,y] += 1
-
-            if diff[x,y] > binaryMapPeakFlux[x,y]:
-                binaryMapPeakFlux[x,y] = diff[x,y]
-
-            #the below saves the distance from pointing center
-            binaryMapDistFromPC[x,y] = np.sqrt((x-(imgSize/2.0))**2.0+(y-(imgSize/2.0))**2.0)*0.0833333
-           
-            if checkValid(x+1,y,floodfillValue):
-                q.append([x+1,y])
-
-            if checkValid(x, y+1, floodfillValue):
-                q.append([x, y+1])
-
-            if checkValid(x-1,y,floodfillValue):
-                q.append([x-1,y])
-
-            if checkValid(x, y-1, floodfillValue):
-                q.append([x, y-1])
-
-            if checkValid(x-1, y-1, floodfillValue):
-                q.append([x-1, y-1])
-
-            if checkValid(x+1,y-1,floodfillValue):
-                q.append([x+1, y-1])
-
-            if checkValid(x-1, y+1, floodfillValue):
-                q.append([x-1, y+1])
-
-            if checkValid(x+1, y+1, floodfillValue):
-                q.append([x+1,y+1])
-
-    return
-            
+    return output
 
 
-def main():
-    parser = ArgumentParser("Flagger", description="Flagges and plots DSNRS for RFI")
-    parser.add_argument('--obs', required=True, help="The observation id")
-    parser.add_argument('--freqChannels', default=768,type=int, help="Number of frequency channels to process")
-    parser.add_argument('--timeStep', required=True, type=int, help="The timestep at which RFISeeker runs")
-    parser.add_argument('--seedSigma', default=8, help="The sigma threshold for RFI seeding" )
-    parser.add_argument('--floodfillSigma', default=3, help="The sigma upto which flood fill happens")
-    parser.add_argument('--debug', default=False, type=bool,help="Prints out more values and shows figure if ran in debug mode")
-    parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
-    parser.add_argument('--DSNRS',default=True,help="Disable/Enable DSNRS analysis")
-    parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset in frequency')
-    parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
-    args = parser.parse_args()
-    debug = args.debug
-    timeStep = args.timeStep
+def xy2RaDec(x_array, y_array, wcs):
+    """
+    converts pixel coords to ra dec
 
-    #The below obtains some preiliminary data and checks
-    imgSize, wcs, header = info(str(args.obs) + "-2m-" + str(args.timeStep) + "-" + str(0).zfill(4) + "-"+str(args.ext)+".fits")
-    plt = intialiseMatplotib(debug)
+    Parameters
+    ----------
+    x   : x pixel coord
+    y   : y pixel coord
+    wcs : world coord system obj
+
+    Returns
+    -------
+    ra  : ra in degrees
+    dec : dec in degrees
+    """
+    pixcrd = np.array([x_array, y_array], dtype=np.float64).T
+    world = wcs.wcs_pix2world(pixcrd, 0)
+    #print(world)
+    ra_array, dec_array = world.T
     
+
+    return ra_array, dec_array
+
+
+def getAltAz(ra_array, dec_array, time, wcs):
+    """
+    converts pixel coords to alt az
+
+    Parameters
+    ----------
+    x   : x pixel coord
+    y   : y pixel coord
+    time: utc time object
+    wcs : wcs object
+
+    Returns
+    -------
+    az  : azimuth (degrees)
+    el  : elevation (degrees)
+    """
+    
+    #pixcrd = np.array([[0 ,0 ],[x, y]], dtype=np.float64)
+    #world = wcs.wcs_pix2world(pixcrd, 0)
+    coord = SkyCoord(ra_array, dec_array,unit=(u.deg,u.deg))
+    coord.time = time + timedelta(hours=pos.lon.hourangle)
+    coord = coord.transform_to(AltAz(obstime=time, location=pos))
+
+    return np.degrees(coord.alt.rad), np.degrees(coord.az.rad)
+
+
+def getMeasurements(maskedData, seedValue, wcs, time, streak, diff, std):
+    """
+    get relevent info about the detections
+    
+    Parameters
+    ----------
+    maskedData  : 2d array containing just the streak (head/tail)
+    seedValue   : the seedValue to stop fitting beams
+    wcs         : the wcs object
+    time        : the current utc time
+    streak      : the part of streak currently being investigated
+    diff        : the diff image
+    std         : standard deviation
+
+    Returns
+    -------
+    x_array     : x pixel
+    y_array     : y pixel
+    ra_array    : ra of the pixel
+    dec_array   : dec of the pixel
+    az_array    : az of the pixel
+    el_array    : el of the pixel
+    amp_array   : amp of the pixel
+    snr_array   : snr of the pixel
+    """
+
+    x_array, y_array, ra_array, dec_array, az_array,alt_array = [], [], [], [], [], []
+    amp_array, snr_array = [], []
+
+    points = np.array(np.where(maskedData > 0)).T
+
+    for p in points:
+        #print("p {0}".format(p))
+        row, col = p
+        #print("row {1} col {2}".format(p,row, col))
+        amp_array.append(maskedData[row, col])
+        sigma = diff[row, col]/std
+        snr_array.append(sigma)
+        x_array.append(col)
+        y_array.append(row)
+        #ra, dec = xy2RaDec(col, row, wcs)
+        #ra_array.append(ra)
+        #dec_array.append(dec)
+        #alt, az = getAltAz(col, row, time, wcs)
+        #el_array.append(alt)
+        #az_array.append(az)
+
+    ra_array, dec_array = xy2RaDec(x_array, y_array, wcs)
+    alt_array, az_array = getAltAz(ra_array, dec_array, time, wcs)
+
+        
+    return x_array, y_array, ra_array, dec_array, az_array,alt_array, amp_array, snr_array
+
+
+
+
+def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
+    prefix, deltaF, streak, ext):
+
+    plt = intialiseMatplotib(plot)
+
     #The below are the output arrays
     global binaryMap
     binaryMap = np.zeros((imgSize,imgSize))
@@ -111,132 +225,149 @@ def main():
     global binaryMapSeed
     binaryMapSeed = np.zeros((imgSize,imgSize))
 
-    for f in range(args.freqChannels):
+    saveFilePrefix=""
+    if streak == "Tail":
+        saveFilePrefix="Neg"
 
-        if timeStep in [0]:
-            break
+    ## create the csv file for saving measurements
+    with open(saveFilePrefix + "measuredValues_t" + str(timeStep).zfill(4) + ".csv", "w") as vsc:
+        thewriter = csv.writer(vsc)
+        thewriter.writerow(["ra", "dec", "SNR", "sourceNo","FluxDensity","az", "elv", "freq", "utc" ,"channelNo","timeStep","x","y","headFile","tailFile","floodfillSigma","seedSigma"])
+
+    beams = 0 # later used to save in measurment.csv
+    sourceNo =0
+
+    for f in range(freqChannels):
+
         f += args.deltaF
 
         if debug is True:
-            print("Working of frequency channel " + str(f+1) + "/" + str(args.freqChannels))
-        
-        hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-        hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+            eprint("Working of frequency channel " + str(f+1) + " at timeStep " + str(timeStep))
 
-        diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
-        std = np.std(diff)
+        try:
+            hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+            hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+            header = hdu2[0].header
+            wcs = WCS(header, naxis=2)
+            time = datetime.strptime(header['DATE-OBS'][:-2], '%Y-%m-%dT%H:%M:%S')
+            freq = float(header['CRVAL3'])/1000000
+        except:
 
-        # The below skips all flagged channels
-        if np.all(diff == 0):
+            if debug:
+                eprint("file not found t {0} f {1}".format(timeStep, f))
             continue
 
-        seedValue = float(args.seedSigma)*std
-        floodfillValue = float(args.floodfillSigma)*std
+        data1 = hdu1[0].data[0,0,:,:]
+        data2 = hdu2[0].data[0,0,:,:]
+
+        if np.all(data1 == 0) or np.all(data2 == 0):
+            
+            if debug:
+                eprint("image full of zeros at t {0} and f {1}".format(timeStep, f))
+            
+            continue
+        
+        diff = data2 - data1
+        std = np.std(diff)
+        seedValue = seedSigma*std
+        floodfillValue = floodfillSigma*std
+
+        if streak == "Tail":
+            seedValue = - float(args.seedSigma)*std
+            floodfillValue =  - float(args.floodfillSigma)*std
 
         # The below checks if max point is greater than seed value
-        maxPoint = np.asarray(np.where(diff == np.max(diff)))
-        if diff[maxPoint[0][0],maxPoint[1][0]] < seedValue:
+        thePoint = np.asarray(np.where(diff == np.max(diff)))
+        
+        if streak == "Tail":
+            thePoint = np.asarray(np.where(diff == np.min(diff)))
+
+        if diff[thePoint[0][0],thePoint[1][0]] < seedValue and streak == "head":
+            continue
+
+        elif diff[thePoint[0][0], thePoint[1][0]] > seedValue and streak == "Tail":
             continue
 
         global binaryMapTemp
         binaryMapTemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
 
         if debug is True:
-            print("RFI detected, seeding....")
-        
-        binaryMapSeed[maxPoint[0][0], maxPoint[1][0]] = 1
-        floodfill(maxPoint[0][0], maxPoint[1][0], floodfillValue,diff , imgSize)    
+            eprint("RFI detected at t {0} f {1}, seeding....".format(timeStep, f))
+
+        binaryMapSeed[thePoint[0][0], thePoint[1][0]] = 1
+
+        if debug:
+            eprint("starting floodfill")
+        floodfill(thePoint[0][0], thePoint[1][0], floodfillValue, diff, streak)
+
+        if debug:
+            eprint("done")
         testPoints = np.asarray(np.where(binaryMapTemp==1)).T
-	Maxdistance = np.max(distance.cdist(testPoints,testPoints))
+        Maxdistance = np.max(distance.cdist(testPoints,testPoints))
         binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
         contourPoints = np.asarray(np.where(binaryMapTemp ==1))
 
-        ## the below breaks out if the current rfi is already investigated
+        # obtain the masked data and write measurement to file
+        if debug:
+            eprint("getting measurements")
+        maskedData = binaryMapTemp*diff
+        x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array =\
+         getMeasurements(maskedData, seedValue, wcs, time, streak, diff, std)
+      
+        if debug:
+            eprint("done...writing to file.....")
+
+        with open(saveFilePrefix + "measuredValues_t" + str(timeStep).zfill(4) + ".csv", "a") as vsc:
+            thewriter = csv.writer(vsc)
+            sourceNo += 1
+
+            for x,y,ra,dec,az,el,amp, snr in zip(x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array):
+                #"ra", "dec", "SNR", "sourceNo","FluxDensity","az", "elv", "freq", "utc" ,"channelNo","timeStep","x","y","headFile","tailFile","floodfillSigma","seedSigma"
+                line = [ra, dec, str(snr) , str(timeStep) + "." + str(sourceNo),\
+                amp,az, el, freq, time, f, timeStep, x, y,str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits", \
+                str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits",floodfillSigma, seedSigma ]
+                thewriter.writerow(line)
+
+        if debug:
+            eprint("done")
+
+        # the below breaks out if the current rfi is already investigated
         if len(contourPoints[0,:]) is 0:
             continue
 
-        cutout = Cutout2D(diff, (maxPoint[1][0],maxPoint[0][0]), (100,100), wcs=wcs)
-        ax = plt.subplot(221, projection=cutout.wcs)
-        plt.imshow(cutout.data, cmap=plt.cm.inferno, origin="lower")
-        plt.grid(color="black",linestyle='-')
-        plt.colorbar()
-         
-        if args.DSNRS == True:
-            snr_array = [None]*args.freqChannels
-            plt.subplot(222)
+        
+    ## the below saves the found values as fits file
+    if debug:
+        eprint("saving files...")
 
-            for f2 in range(args.freqChannels):
-
-                if debug is True:
-                    print("Plotting DSNRS spectrum for RFI at freq " + str(f2))
-
-                hdutemp1 = fits.open(str(args.obs) +"-2m-" + str(timeStep) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                hdutemp2 = fits.open(str(args.obs) +"-2m-" + str(timeStep+1) + "-" + str(f2).zfill(4) + "-"+str(args.ext)+".fits")
-                diff2 = hdutemp2[0].data[0,0,:,:] - hdutemp1[0].data[0,0,:,:]
-
-                if np.all(diff2 == 0):
-                    continue
-
-                noise_rms = np.sqrt(np.mean(diff2**2.0))
-                signal=0
-
-                for pointNo in range(len(contourPoints[0,:])):
-                    signal+=diff2[contourPoints[0,pointNo],contourPoints[1,pointNo]]
-                    signal = signal/float(len(contourPoints[0,:]))
-                    snr_array[f2] = signal/noise_rms
-
-            i_array = np.linspace(72.335,103.015,args.freqChannels)
-            plt.plot(i_array,snr_array,color="black",linewidth=0.5)
-            plt.grid()
-
-        contourImg = Cutout2D(binaryMapTemp, (maxPoint[1][0],maxPoint[0][0]), (100,100),wcs=wcs)
-        ax3 = plt.subplot(223,projection=contourImg.wcs)
-        plt.imshow(contourImg.data, cmap=plt.cm.inferno, origin="lower")
-        plt.grid()
-        plt.colorbar()
-        ax4 = plt.subplot(224, projection=wcs)
-        plt.imshow(diff, cmap=plt.cm.inferno, origin="lower")
-        plt.grid()
-        plt.scatter(maxPoint[1][0],maxPoint[0][0],s=80,facecolors='none',edgecolors='lime')
-
-        if debug is True:
-            plt.show()
-
-	else:
-	    plt.savefig( str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + "_atFreq" + str(f).zfill(4) + ".png")
-            plt.clf()
-
-
-    # the below saves the found values as fits files
-
-    if os.path.isfile(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"):
-        bashSyn1 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
+    if os.path.isfile(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"):
+        bashSyn1 = "rm "+ str(saveFilePrefix) + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
         bashExecute1 = call(bashSyn1,shell=True)
 
     hdun = fits.PrimaryHDU(binaryMap,header=header)
-    hdun.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
+    hdun.writeto(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits")
 
-    if os.path.isfile(str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits"):
-        bashSyn3 = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits"
+    if os.path.isfile(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits"):
+        bashSyn3 = "rm " +str(saveFilePrefix)+ str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits"
         bashExecute3 = call(bashSyn3,shell=True)
 
     hdun2 = fits.PrimaryHDU(binaryMapPeakFlux,header=header)
-    hdun2.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits")
+    hdun2.writeto(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "RFIBinaryMapPeakFlux-t" + str(timeStep).zfill(4) + ".fits")
 
-    if os.path.isfile(str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits"):
-        bashSyn4  = "rm " + str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits"       
+    if os.path.isfile(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits"):
+        bashSyn4  = "rm " +str(saveFilePrefix)+ str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits"       
         bashExecute4 = call(bashSyn4,shell=True)
 
     hdu3 =  fits.PrimaryHDU(binaryMapSeed,header=header)
-    hdu3.writeto(str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits")
+    hdu3.writeto(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "RFIBinaryMapSeed-t" + str(timeStep).zfill(4) + ".fits")
  
 
     ## The below makes the CSV file containing the meta data from the RFISeeker
-    if os.path.isfile(str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"):
-        bashSyn2 = "rm " + str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"
+    if os.path.isfile(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"):
+        bashSyn2 = "rm " +str(saveFilePrefix)+ str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv"
         bashExecute2 = call(bashSyn2,shell=True)
 
-    with open(str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv","w") as vsc:
+    with open(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "-FreqInfo-t" + str(timeStep).zfill(4)+ ".csv","w") as vsc:
         thewriter = csv.writer(vsc)
         thewriter.writerow(["x","y","PeakFluxDensity","NoOfChannels","DistanceFromPhaseCenter","NoOfPixels"])
         points = np.asarray(np.where(binaryMap != 0)).T
@@ -250,6 +381,42 @@ def main():
             line = [x,y,peakFluxDensity,NoOfChannels,DistanceFromPhaseCenter,NoOfPixels]
             thewriter.writerow(line)
 
+    
+    if debug:
+        eprint("finished t {0} ".format(timeStep))    
 
-if __name__ =="__main__":
-    main()
+    #### "That's all Folks!"" ###        
+    if debug:
+        eprint(" That's all Folks! ")
+    
+
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser("Flagger", description="Flagges and plots DSNRS for RFI")
+    parser.add_argument('--obs', required=True, help="The observation id")
+    parser.add_argument('--freqChannels', default=768,type=int, help="Number of frequency channels to process")
+    parser.add_argument('--timeStep', required=True, type=int, help="The timestep at which RFISeeker runs")
+    parser.add_argument('--seedSigma', default=8, type=float, help="The sigma threshold for RFI seeding" )
+    parser.add_argument('--floodfillSigma', default=3, type=float,help="The sigma upto which flood fill happens")
+    parser.add_argument('--debug', default=False, type=bool,help="Prints out more values and shows figure if ran in debug mode")
+    parser.add_argument('--plot', default=False, type=bool,help="shows figure")
+    parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
+    parser.add_argument('--DSNRS',default=True, type=bool,help="Disable/Enable DSNRS analysis")
+    parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset in frequency')
+    parser.add_argument("--streak", default="head", choices=["head", "Tail"],help="The part of streak to extrack i.e head or tail")
+    parser.add_argument("--imgSize", required=True, type=int, help="the size of image (1 Dimension alone)")
+    parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
+    args = parser.parse_args()
+    
+    global debug, dsnrs, imgSize, plot
+    debug = args.debug
+    dsnrs = args.DSNRS
+    imgSize = args.imgSize
+    plot = args.plot
+
+    if debug:
+        eprint("running rfiseeker in debug mode at timeStep {0}".format(args.timeStep))
+
+    main(args.obs, args.freqChannels, args.timeStep, args.seedSigma, args.floodfillSigma,\
+    args.prefix, args.deltaF, args.streak, args.ext)
