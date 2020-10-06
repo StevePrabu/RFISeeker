@@ -237,6 +237,11 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
     beams = 0 # later used to save in measurment.csv
     sourceNo =0
 
+    ## read beamFile
+    # hdu_beam = fits.open(beamFile)
+    # beam_model = hdu_beam[0].data
+
+
     for f in range(freqChannels):
 
         f += args.deltaF
@@ -268,7 +273,8 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
             continue
         
         diff = data2 - data1
-        std = np.std(diff)
+        #diff /= beam_model
+        std = np.nanstd(diff)
         seedValue = seedSigma*std
         floodfillValue = floodfillSigma*std
 
@@ -277,10 +283,10 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
             floodfillValue =  - float(args.floodfillSigma)*std
 
         # The below checks if max point is greater than seed value
-        thePoint = np.asarray(np.where(diff == np.max(diff)))
+        thePoint = np.asarray(np.where(diff == np.nanmax(diff)))
         
         if streak == "Tail":
-            thePoint = np.asarray(np.where(diff == np.min(diff)))
+            thePoint = np.asarray(np.where(diff == np.nanmin(diff)))
 
         if diff[thePoint[0][0],thePoint[1][0]] < seedValue and streak == "head":
             continue
@@ -406,6 +412,7 @@ if __name__ == "__main__":
     parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset in frequency')
     parser.add_argument("--streak", default="head", choices=["head", "Tail"],help="The part of streak to extrack i.e head or tail")
     parser.add_argument("--imgSize", required=True, type=int, help="the size of image (1 Dimension alone)")
+    #parser.add_argument("--beamFile",required=True, help="the beam gain pattern file")
     parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
     args = parser.parse_args()
     
