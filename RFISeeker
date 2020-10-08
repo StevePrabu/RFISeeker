@@ -207,7 +207,7 @@ def getMeasurements(maskedData, seedValue, wcs, time, streak, diff, std):
 
 
 def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
-    prefix, deltaF, streak, ext):
+    prefix, deltaF, streak, ext, allEvents):
 
     plt = intialiseMatplotib(plot)
 
@@ -237,11 +237,7 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
     beams = 0 # later used to save in measurment.csv
     sourceNo =0
 
-    ## read beamFile
-    # hdu_beam = fits.open(beamFile)
-    # beam_model = hdu_beam[0].data
-
-
+    
     for f in range(freqChannels):
 
         f += args.deltaF
@@ -258,8 +254,7 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
             freq = float(header['CRVAL3'])/1000000
         except:
 
-            if debug:
-                eprint("file not found t {0} f {1}".format(timeStep, f))
+            eprint("file not found t {0} f {1}".format(timeStep, f))
             continue
 
         data1 = hdu1[0].data[0,0,:,:]
@@ -273,73 +268,127 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
             continue
         
         diff = data2 - data1
-        #diff /= beam_model
         std = np.nanstd(diff)
         seedValue = seedSigma*std
         floodfillValue = floodfillSigma*std
-
-        if streak == "Tail":
-            seedValue = - float(args.seedSigma)*std
-            floodfillValue =  - float(args.floodfillSigma)*std
-
-        # The below checks if max point is greater than seed value
-        thePoint = np.asarray(np.where(diff == np.nanmax(diff)))
-        
-        if streak == "Tail":
-            thePoint = np.asarray(np.where(diff == np.nanmin(diff)))
-
-        if diff[thePoint[0][0],thePoint[1][0]] < seedValue and streak == "head":
-            continue
-
-        elif diff[thePoint[0][0], thePoint[1][0]] > seedValue and streak == "Tail":
-            continue
-
         global binaryMapTemp
-        binaryMapTemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
 
-        if debug is True:
-            eprint("RFI detected at t {0} f {1}, seeding....".format(timeStep, f))
+        if allEvents:
+            seeds = np.asarray(np.where(diff >= seedValue)).T
+            for seed in seeds:
+                binaryMapTemp = np.zeros((imgSize,imgSize))
 
-        binaryMapSeed[thePoint[0][0], thePoint[1][0]] = 1
+                if debug is True:
+                    eprint("RFI detected at t {0} f {1}, seeding....".format(timeStep, f))
 
-        if debug:
-            eprint("starting floodfill")
-        floodfill(thePoint[0][0], thePoint[1][0], floodfillValue, diff, streak)
+                binaryMapSeed[seed[0], seed[1]] = 1
+                
+                if debug:
+                    eprint("starting floodfill")
+                floodfill(seed[0], seed[1], floodfillValue, diff, streak)
+                testPoints = np.asarray(np.where(binaryMapTemp==1)).T
+                Maxdistance = np.max(distance.cdist(testPoints,testPoints))
+                binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
+                contourPoints = np.asarray(np.where(binaryMapTemp ==1))
+                if debug:
+                    eprint("getting measurements")
+                maskedData = binaryMapTemp*diff
+                x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array =\
+                 getMeasurements(maskedData, seedValue, wcs, time, streak, diff, std)
 
-        if debug:
-            eprint("done")
-        testPoints = np.asarray(np.where(binaryMapTemp==1)).T
-        Maxdistance = np.max(distance.cdist(testPoints,testPoints))
-        binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
-        contourPoints = np.asarray(np.where(binaryMapTemp ==1))
+                if debug:
+                    eprint("done...writing to file.....")
 
-        # obtain the masked data and write measurement to file
-        if debug:
-            eprint("getting measurements")
-        maskedData = binaryMapTemp*diff
-        x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array =\
-         getMeasurements(maskedData, seedValue, wcs, time, streak, diff, std)
+                with open(saveFilePrefix + "measuredValues_t" + str(timeStep).zfill(4) + ".csv", "a") as vsc:
+                    thewriter = csv.writer(vsc)
+                    sourceNo += 1
+
+                    for x,y,ra,dec,az,el,amp, snr in zip(x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array):
+                        #"ra", "dec", "SNR", "sourceNo","FluxDensity","az", "elv", "freq", "utc" ,"channelNo","timeStep","x","y","headFile","tailFile","floodfillSigma","seedSigma"
+                        line = [ra, dec, str(snr) , str(timeStep) + "." + str(sourceNo),\
+                        amp,az, el, freq, time, f, timeStep, x, y,str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits", \
+                        str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits",floodfillSigma, seedSigma ]
+                        thewriter.writerow(line)
+
+                if debug:
+                    eprint("done")
+
+                # the below breaks out if the current rfi is already investigated
+                if len(contourPoints[0,:]) is 0:
+                    continue
+
+
+
+	### default setting when we search only for the brightest event
+        
+        if not allEvents:
+            if streak == "Tail":
+                seedValue = - float(args.seedSigma)*std
+                floodfillValue =  - float(args.floodfillSigma)*std
+
+            # The below checks if max point is greater than seed value
+            thePoint = np.asarray(np.where(diff == np.nanmax(diff)))
+        
+            if streak == "Tail":
+                thePoint = np.asarray(np.where(diff == np.nanmin(diff)))
+
+            if diff[thePoint[0][0],thePoint[1][0]] < seedValue and streak == "head":
+                continue
+
+            elif diff[thePoint[0][0], thePoint[1][0]] > seedValue and streak == "Tail":
+                continue
+
+            
+            binaryMapTemp = np.zeros((imgSize,imgSize)) ## binarymap that stores only the local RFI
+
+            if debug is True:
+                eprint("RFI detected at t {0} f {1}, seeding....".format(timeStep, f))
+
+            binaryMapSeed[thePoint[0][0], thePoint[1][0]] = 1
+
+            if debug:
+                eprint("starting floodfill")
+            floodfill(thePoint[0][0], thePoint[1][0], floodfillValue, diff, streak)
+
+            if debug:
+                eprint("done")
+            testPoints = np.asarray(np.where(binaryMapTemp==1)).T
+            Maxdistance = np.max(distance.cdist(testPoints,testPoints))
+            binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
+            contourPoints = np.asarray(np.where(binaryMapTemp ==1))
+
+            # obtain the masked data and write measurement to file
+            if debug:
+                eprint("getting measurements")
+            maskedData = binaryMapTemp*diff
+            x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array =\
+             getMeasurements(maskedData, seedValue, wcs, time, streak, diff, std)
       
-        if debug:
-            eprint("done...writing to file.....")
+            if debug:
+                eprint("done...writing to file.....")
 
-        with open(saveFilePrefix + "measuredValues_t" + str(timeStep).zfill(4) + ".csv", "a") as vsc:
-            thewriter = csv.writer(vsc)
-            sourceNo += 1
+            with open(saveFilePrefix + "measuredValues_t" + str(timeStep).zfill(4) + ".csv", "a") as vsc:
+                thewriter = csv.writer(vsc)
+                sourceNo += 1
 
-            for x,y,ra,dec,az,el,amp, snr in zip(x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array):
-                #"ra", "dec", "SNR", "sourceNo","FluxDensity","az", "elv", "freq", "utc" ,"channelNo","timeStep","x","y","headFile","tailFile","floodfillSigma","seedSigma"
-                line = [ra, dec, str(snr) , str(timeStep) + "." + str(sourceNo),\
-                amp,az, el, freq, time, f, timeStep, x, y,str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits", \
-                str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits",floodfillSigma, seedSigma ]
-                thewriter.writerow(line)
+                for x,y,ra,dec,az,el,amp, snr in zip(x_array, y_array, ra_array, dec_array, az_array,el_array, amp_array, snr_array):
+                    #"ra", "dec", "SNR", "sourceNo","FluxDensity","az", "elv", "freq", "utc" ,"channelNo","timeStep","x","y","headFile","tailFile","floodfillSigma","seedSigma"
+                    line = [ra, dec, str(snr) , str(timeStep) + "." + str(sourceNo),\
+                    amp,az, el, freq, time, f, timeStep, x, y,str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits", \
+                    str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits",floodfillSigma, seedSigma ]
+                    thewriter.writerow(line)
 
-        if debug:
-            eprint("done")
+            if debug:
+                eprint("done")
 
-        # the below breaks out if the current rfi is already investigated
-        if len(contourPoints[0,:]) is 0:
-            continue
+            # the below breaks out if the current rfi is already investigated
+            if len(contourPoints[0,:]) is 0:
+                continue
+        
+   
+              
+
+     
 
         
     ## the below saves the found values as fits file
@@ -412,7 +461,7 @@ if __name__ == "__main__":
     parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset in frequency')
     parser.add_argument("--streak", default="head", choices=["head", "Tail"],help="The part of streak to extrack i.e head or tail")
     parser.add_argument("--imgSize", required=True, type=int, help="the size of image (1 Dimension alone)")
-    #parser.add_argument("--beamFile",required=True, help="the beam gain pattern file")
+    parser.add_argument("--config",default=False,type=bool, help="allow multiple detections? Default=False")
     parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
     args = parser.parse_args()
     
@@ -426,4 +475,4 @@ if __name__ == "__main__":
         eprint("running rfiseeker in debug mode at timeStep {0}".format(args.timeStep))
 
     main(args.obs, args.freqChannels, args.timeStep, args.seedSigma, args.floodfillSigma,\
-    args.prefix, args.deltaF, args.streak, args.ext)
+    args.prefix, args.deltaF, args.streak, args.ext, args.config)
