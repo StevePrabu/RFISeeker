@@ -207,7 +207,7 @@ def getMeasurements(maskedData, seedValue, wcs, time, streak, diff, std):
 
 
 def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
-    prefix, deltaF, streak, ext, allEvents):
+    prefix, deltaF, streak, ext, allEvents, midName):
 
     plt = intialiseMatplotib(plot)
 
@@ -228,6 +228,12 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
     saveFilePrefix=""
     if streak == "Tail":
         saveFilePrefix="Neg"
+    
+    ## update the prfix if midname not 2m. This done to incorporate multiple bands of obs for spacefest
+    if (midName == "2m") == False:
+        saveFilePrefix = midName + saveFilePrefix
+
+
 
     ## create the csv file for saving measurements
     with open(saveFilePrefix + "measuredValues_t" + str(timeStep).zfill(4) + ".csv", "w") as vsc:
@@ -246,15 +252,17 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
             eprint("Working of frequency channel " + str(f+1) + " at timeStep " + str(timeStep))
 
         try:
-            hdu1 = fits.open(str(args.obs) + "-2m-" + str(timeStep) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
-            hdu2 = fits.open(str(args.obs) + "-2m-" + str(timeStep+1) + "-" + str(f).zfill(4) + "-"+str(args.ext)+".fits")
+            hdu1 = fits.open(str(args.obs) + "-"+str(midName)+"-" + str(timeStep) +"-"+ str(f).zfill(4)  + "-" +str(args.ext)+".fits")
+            hdu2 = fits.open(str(args.obs) + "-"+str(midName)+"-" + str(timeStep+1) + "-"+str(f).zfill(4)+ "-" +str(args.ext)+".fits")
             header = hdu2[0].header
             wcs = WCS(header, naxis=2)
             time = datetime.strptime(header['DATE-OBS'][:-2], '%Y-%m-%dT%H:%M:%S')
             freq = float(header['CRVAL3'])/1000000
         except:
-
+            
             eprint("file not found t {0} f {1}".format(timeStep, f))
+            eprint(str(args.obs) + "-"+str(midName)+"-" + str(timeStep) +"-"+ str(f).zfill(4)  + "-" +str(args.ext)+".fits")
+            eprint(str(args.obs) + "-"+str(midName)+"-" + str(timeStep+1) + "-"+str(f).zfill(4)+ "-" +str(args.ext)+".fits")
             continue
 
         data1 = hdu1[0].data[0,0,:,:]
@@ -394,6 +402,7 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
     ## the below saves the found values as fits file
     if debug:
         eprint("saving files...")
+    
 
     if os.path.isfile(str(saveFilePrefix)+str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"):
         bashSyn1 = "rm "+ str(saveFilePrefix) + str(args.prefix) + "Sigma" + "RFIBinaryMap-t" + str(timeStep).zfill(4) + ".fits"
@@ -460,6 +469,7 @@ if __name__ == "__main__":
     parser.add_argument('--DSNRS',default=True, type=bool,help="Disable/Enable DSNRS analysis")
     parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset in frequency')
     parser.add_argument("--streak", default="head", choices=["head", "Tail"],help="The part of streak to extrack i.e head or tail")
+    parser.add_argument("--midName",default="2m", help="the mid name of the fits files")
     parser.add_argument("--imgSize", required=True, type=int, help="the size of image (1 Dimension alone)")
     parser.add_argument("--config",default=False,type=bool, help="allow multiple detections? Default=False")
     parser.add_argument('--ext',default="dirty",help="choose between dirty and iamge")
@@ -475,4 +485,4 @@ if __name__ == "__main__":
         eprint("running rfiseeker in debug mode at timeStep {0}".format(args.timeStep))
 
     main(args.obs, args.freqChannels, args.timeStep, args.seedSigma, args.floodfillSigma,\
-    args.prefix, args.deltaF, args.streak, args.ext, args.config)
+    args.prefix, args.deltaF, args.streak, args.ext, args.config, args.midName)
