@@ -329,6 +329,66 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
 
 	### default setting when we search only for the brightest event
         
+        def make_dsnrs(channels, mask, c):
+            signal_array =  np.zeros(channels)
+            snr_array = np.zeros(channels)
+            
+            if debug:
+                print("making dsnrsn")
+
+            for fi in range(channels):
+
+                if debug:
+                    print("dsnrs at channel {}".format(fi))
+                hdu1 = fits.open(str(args.obs) + "-"+str(midName)+"-" + str(timeStep) +"-"+ str(fi).zfill(4)  + "-" +str(args.ext)+".fits")
+                hdu2 = fits.open(str(args.obs) + "-"+str(midName)+"-" + str(timeStep+1) + "-"+str(fi).zfill(4)+ "-" +str(args.ext)+".fits")
+                diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
+                tmp = np.copy(diff)
+                diff *= mask
+                signal_array[fi] = np.nanmax(diff)
+                if np.all(diff == 0):
+                    continue
+                tmp[np.abs(tmp) > 3*np.std(tmp)] = 0
+                tmp[np.abs(tmp) > 3*np.std(tmp)] = 0
+                noise = np.std(tmp)
+                snr = np.nanmax(diff)/noise
+                snr_array[fi] = snr
+                
+
+            fig, ax = plt.subplots(figsize=(10,10))
+            plt.subplot(221)
+            plt.plot(signal_array)
+            plt.xlabel("channel no")
+            plt.ylabel("dsnrs")
+
+            plt.subplot(222, projection=wcs)
+            plt.title("event mask")
+            plt.imshow(mask, origin="lower")
+            plt.grid()
+
+            
+            plt.subplot(223)
+            plt.title("snr")            
+            plt.plot(snr_array)
+            plt.hlines(6, 0 , channels)
+            
+
+            
+            hdu1 = fits.open(str(args.obs) + "-"+str(midName)+"-" + str(timeStep) +"-"+ str(f).zfill(4)  + "-" +str(args.ext)+".fits")
+            hdu2 = fits.open(str(args.obs) + "-"+str(midName)+"-" + str(timeStep+1) + "-"+str(f).zfill(4)+ "-" +str(args.ext)+".fits")
+            diff = hdu2[0].data[0,0,:,:] - hdu1[0].data[0,0,:,:]
+
+            plt.subplot(224, projection=wcs)
+            plt.title("channel {}".format(f))
+            plt.imshow(diff, origin="lower")
+            plt.grid()
+            plt.colorbar()
+
+            plt.savefig("rfiseekerEvent-t{}-f{}.png".format(timeStep, f))
+        
+
+            return 
+
         if not allEvents:
             if streak == "Tail":
                 seedValue = - float(args.seedSigma)*std
@@ -354,16 +414,23 @@ def main(obs, freqChannels, timeStep, seedSigma, floodfillSigma,\
 
             binaryMapSeed[thePoint[0][0], thePoint[1][0]] = 1
 
+
+
             if debug:
                 eprint("starting floodfill")
+            binaryMapBefore = np.copy(binaryMap)
             floodfill(thePoint[0][0], thePoint[1][0], floodfillValue, diff, streak)
-
+            
             if debug:
                 eprint("done")
             testPoints = np.asarray(np.where(binaryMapTemp==1)).T
             Maxdistance = np.max(distance.cdist(testPoints,testPoints))
             binaryMapNoPixels[np.where(binaryMapTemp==1)] = Maxdistance
             contourPoints = np.asarray(np.where(binaryMapTemp ==1))
+            if dsnrs:
+                ## check if event previusly detected (to avoid making dsnrs again)
+                if binaryMapBefore[thePoint[0][0], thePoint[1][0]] == 0:
+                    make_dsnrs(freqChannels, binaryMapTemp, f)
 
             # obtain the masked data and write measurement to file
             if debug:
