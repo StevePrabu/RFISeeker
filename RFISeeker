@@ -533,7 +533,7 @@ if __name__ == "__main__":
     parser.add_argument('--debug', default=False, type=bool,help="Prints out more values and shows figure if ran in debug mode")
     parser.add_argument('--plot', default=False, type=bool,help="shows figure")
     parser.add_argument('--prefix',required=False,help="The prefix used in the ouputfiles")
-    parser.add_argument('--DSNRS',default=True, type=bool,help="Disable/Enable DSNRS analysis")
+    parser.add_argument('--DSNRS',default=False, type=bool,help="Disable/Enable DSNRS analysis")
     parser.add_argument('--deltaF',required=False,default=0,type=int,help='The offset in frequency')
     parser.add_argument("--streak", default="head", choices=["head", "Tail"],help="The part of streak to extrack i.e head or tail")
     parser.add_argument("--midName",default="2m", help="the mid name of the fits files")
